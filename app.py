@@ -10,6 +10,13 @@ import xml.etree.ElementTree as ET
 # 설정은 맨 위에
 st.set_page_config(layout="wide")
 
+@st.cache_data(ttl=3600)
+def load_data(ticker):
+	data = yf.Ticker(ticker)
+	df_history = data.history(period="2y")
+	info_data = data.info
+	return df_history, info_data
+
 if 'watchlist' not in st.session_state:
 	st.session_state['watchlist'] = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'JPM']
 
@@ -32,9 +39,7 @@ st.title("주식 AI 분석 앱")
 ticker_symbol = st.text_input("직접 검색하거나 왼쪽 리스트에서 선택하세요:", selected_ticker).upper()
 
 try:
-	ticker_data = yf.Ticker(ticker_symbol)
-	df = ticker_data.history(period = "2y")
-	info = ticker_data.info
+	df, info = load_data(ticker_symbol)
 
 	current_price = info.get('currentPrice')
 	if current_price is None:
