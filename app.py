@@ -8,6 +8,10 @@ import urllib.request
 import xml.etree.ElementTree as ET
 import requests
 
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
 # 설정은 맨 위에
 st.set_page_config(layout="wide")
 
@@ -184,25 +188,39 @@ try:
 
 	st.divider()
 	
-	# AI 예측
+	st.subheader("AI 딥러닝(LSTM) 내일 주가 예측")
+	st.write("딥러닝 모델이 과거 10일치 패턴을 학습 중...⏳")
+
 	df_clean = df.dropna()
-	# AI가 RSI랑 MACD 보고 판단
-	features = ['Close', '20일_이동평균', '60일_이동평균', '수익률']
-	x = df_clean[features]
-	y = df_clean['Target']
+	features = ['Close', '20일_이동평균', '60일_이동평균', '수익률', 'RSI', 'MACD']
 
-	model = RandomForestClassifier(n_estimators = 100, random_state = 42)
-	model.fit(x, y)
+	scaler = MinMaxScaler()
+	scaled_data = scaler.fit_transform(df_clean[features])
 
-	latest_data = x.iloc[-1:]
-	prediction = model.predict(latest_data)
-	probability = model.predict_proba(latest_data) [0]
+	time_step = 10
+	X_lstm, y_lstm = [], []
+	for i in range9len(scaled_data) - time_step):
+		X_lstm.append(scaled_data[i:(i + time_step)])
+		y_lstm.append(df_clean['Target'].iloc[i + time_step])
 
-	st.subheader("AI의 내일 주가 예측 결과")
-	if prediction[0] == 1:
-		st. success(f"내일은 **상승**할 것으로 예측됩니다! (상승 확률: {probability[1]*100:.1f}%_")
+	X_lstm, y_lstm = np.array(X_lstm), np.array(y_lstm)
+
+	model = Sequential()
+	model.add(LSTM(50, return_sequences=False, input_shape=(X_lstm.shape[1], X_lstm.shape[2])))
+	model.add(Dense(1, activation='sigmoid'))
+	model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+	model.fit(X_lstm, y_lstm, epochs=5, batch_size=16, verbose=0)
+
+	last_10_days = scaled_data[-time_step:]
+	last_10_days = np.expand_dims(last_10_days, axis=0)
+
+	prediction_prob = model.predict(last_10_days, verbose=0)[0][0]
+
+	if prediction_prob > 0.5:
+		st.success(f"딥러닝 예측: 내일은 **상승**할 확률이 높습니다! (상승 확률: {prediction_prob*100:.1f}%)")
 	else:
-		st.error(f"내일은 **하락**할 것으로 예측됩니다. (하락 확률: {probability[0]*100:.1f}%)")
+		st.error(f"딥러닝 예측: 내일은 **하락**할 확률이 높습니다. (하락 확률: {(1-prediction_prob)*100:.1f}%)")
 
 	st.divider()
 
