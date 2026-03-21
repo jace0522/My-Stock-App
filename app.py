@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import urllib.request
 import xml.etree.ElementTree as ET
+import requests
 
 # 설정은 맨 위에
 st.set_page_config(layout="wide")
