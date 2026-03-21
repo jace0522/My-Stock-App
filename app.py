@@ -12,6 +12,11 @@ st.set_page_config(layout="wide")
 
 @st.cache_data(ttl=3600)
 def load_data(ticker):
+	session = requests.Session()
+	session.headers.update(
+		{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+	)
+	
 	data = yf.Ticker(ticker)
 	df_history = data.history(period="2y")
 	info_data = data.info
