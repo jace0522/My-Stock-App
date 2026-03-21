@@ -17,16 +17,9 @@ st.set_page_config(layout="wide")
 
 @st.cache_data(ttl=3600)
 def load_data(ticker):
-	session = requests.Session()
-	session.headers.update(
-		{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-		'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-		'Accept-Language': 'en-US,en;q=0.5'
-	})
-	
-	data = yf.Ticker(ticker, session=session)
+	data = yf.Ticker(ticker)
 	df_history = data.history(period="2y")
-	
+
 	info_data = {}
 	try:
 		info_data = data.info
