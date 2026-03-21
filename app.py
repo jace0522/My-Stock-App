@@ -25,15 +25,15 @@ def load_data(ticker):
 	})
 	
 	data = yf.Ticker(ticker, session=session)
-   	df_history = data.history(period="2y")
-    
-  	info_data = {}
-   	try:
-        	info_data = data.info
-    	except:
-        	pass 
-        
-    	return df_history, info_data
+	df_history = data.history(period="2y")
+	
+	info_data = {}
+	try:
+		info_data = data.info
+	except:
+		pass
+	
+	return df_history, info_data
 
 if 'watchlist' not in st.session_state:
 	st.session_state['watchlist'] = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'JPM']
@@ -61,17 +61,17 @@ try:
 
 	current_price = info.get('currentPrice')
 	if not current_price:
-        	current_price = info.get('regularMarketPrice')
-    	if not current_price: 
-        	current_price = round(df['Close'].iloc[-1], 2)
+		current_price = info.get('regularMarketPrice')
+	if not current_price: 
+		current_price = round(df['Close'].iloc[-1], 2)
 	
 	short_name = info.get('shortName', ticker_symbol)
-    	st.subheader(f"🏢 {short_name} 요약 정보")
-    
-   	col1, col2, col3 = st.columns(3)
-    	col1.metric("현재 주가", f"${current_price}")
-   	col2.metric("PER (주가수익비율)", info.get('trailingPE', 'N/A'))
-   	col3.metric("52주 최고가", f"${info.get('fiftyTwoWeekHigh', 'N/A')}")
+	st.subheader(f"🏢 {short_name} 요약 정보")
+
+	col1, col2, col3 = st.columns(3)
+	col1.metric("현재 주가", f"${current_price}")
+	col2.metric("PER (주가수익비율)", info.get('trailingPE', 'N/A'))
+	col3.metric("52주 최고가", f"${info.get('fiftyTwoWeekHigh', 'N/A')}")
 
 	st.divider()
 
