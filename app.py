@@ -199,7 +199,7 @@ try:
 
 	time_step = 10
 	X_lstm, y_lstm = [], []
-	for i in range9len(scaled_data) - time_step):
+	for i in range(len(scaled_data) - time_step):
 		X_lstm.append(scaled_data[i:(i + time_step)])
 		y_lstm.append(df_clean['Target'].iloc[i + time_step])
 
