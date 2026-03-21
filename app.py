@@ -19,13 +19,21 @@ st.set_page_config(layout="wide")
 def load_data(ticker):
 	session = requests.Session()
 	session.headers.update(
-		{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-	)
+		{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+		'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+		'Accept-Language': 'en-US,en;q=0.5'
+	})
 	
-	data = yf.Ticker(ticker)
-	df_history = data.history(period="2y")
-	info_data = data.info
-	return df_history, info_data
+	data = yf.Ticker(ticker, session=session)
+   	df_history = data.history(period="2y")
+    
+  	info_data = {}
+   	try:
+        	info_data = data.info
+    	except:
+        	pass 
+        
+    	return df_history, info_data
 
 if 'watchlist' not in st.session_state:
 	st.session_state['watchlist'] = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'JPM']
@@ -52,14 +60,18 @@ try:
 	df, info = load_data(ticker_symbol)
 
 	current_price = info.get('currentPrice')
-	if current_price is None:
-		current_price = info.get('regularMarketPrice', 0)
+	if not current_price:
+        	current_price = info.get('regularMarketPrice')
+    	if not current_price: 
+        	current_price = round(df['Close'].iloc[-1], 2)
 	
-	st.subheader(f"{info.get('shortName', ticker_symbol)} 요약 정보")
-	col1, col2, col3 = st.columns(3)
-	col1.metric("현재 주가", f"${info.get('currentPrice', 0)}")
-	col2.metric("PER (주가수익비율)", info.get('trailingPE', 'N/A'))
-	col3.metric("52주 최고가", f"${info.get('fiftyTwoWeekHigh', 0)}")
+	short_name = info.get('shortName', ticker_symbol)
+    	st.subheader(f"🏢 {short_name} 요약 정보")
+    
+   	col1, col2, col3 = st.columns(3)
+    	col1.metric("현재 주가", f"${current_price}")
+   	col2.metric("PER (주가수익비율)", info.get('trailingPE', 'N/A'))
+   	col3.metric("52주 최고가", f"${info.get('fiftyTwoWeekHigh', 'N/A')}")
 
 	st.divider()
 
