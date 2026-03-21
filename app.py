@@ -7,6 +7,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import urllib.request
 import xml.etree.ElementTree as ET
 import requests
+import re
 
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
@@ -27,6 +28,26 @@ def load_data(ticker):
 		pass
 	
 	return df_history, info_data
+
+@st.cache_data(ttl=3600)
+def get_finviz_data(ticker):
+	try:
+		url = f"https://finviz.com/quote.ashx?t={ticker}"
+		headers = {'User-Agent': 'Mozilla/5.0'}
+		res = requests.get(url, headers=headers, timeout=5)
+		html = res.text
+
+		pe_match = re.search(r'P/E</td>[^>]+><b>([^<]+)</b>', html)
+		pbr_match = re.search(r'P/B</td>[^>]+><b>([^<]+)</b>', html)
+		target_match = re.search(r'Target Price</td>[^>]+><b>([^<]+)</b>', html)
+
+		pe = float(pe_match.group(1).replace(',','')) if pe_match and pe_match.group(1) != '-' else 0
+		pbr = float(pbr_match.group(1).replace(',','')) if pbr_match and pbr_match.group(1) != '-' else 0
+		target = float(target_match.group(1).replace(',','')) if target_match and target_match.group(1) != '-' else 0
+
+		return pe, pbr, target
+	except:
+		return 0, 0, 0
 
 if 'watchlist' not in st.session_state:
 	st.session_state['watchlist'] = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'JPM']
@@ -69,9 +90,15 @@ try:
 	st.divider()
 
 	st.subheader("⚖️ 기업 가치 평가 (고평가 vs 저평가)")
-	per = info.get('trailingPE', 0)
-	pbr = info.get('priceToBook', 0)
-	target_price = info.get('targetMeanPrice', 0)
+	per = info.get('trailingPE') or 0
+	pbr = info.get('priceToBook') or 0
+	target_price = info.get('targetMeanPrice') or 0
+
+	if per == 0 or pbr == 0:
+		fv_pe, fv_pbr, fv_target = get_finviz_data(ticker_symbol)
+		per = fv_pe if per == 0 else per
+		pbr = fv_pbr if pbr == 0 else pbr
+		target_price = fv_target if target_price == 0 else target_price
 
 	v_col1, v_col2, v_col3 = st.columns(3)
 
