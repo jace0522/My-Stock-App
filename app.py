@@ -54,23 +54,37 @@ def get_finviz_data(ticker):
 	except:
 		return 0, 0, 0
 
-if 'watchlist' not in st.session_state:
-	st.session_state['watchlist'] = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'JPM']
+if 'portfolio' not in st.session_state:
+	st.session_state['portfolio'] = {
+		"💻 빅테크 & AI": ['AAPL', 'MSFT', 'GOOGL'],
+		"🏎️ F1 & 모터스포츠": ['FWONK', 'RACE', 'F'],
+		"🎮 PC 게임 & 하드웨어": ['NVDA', 'AMD', 'EA'],
+		"🧪 화학 & 헬스케어": ['JNJ', 'PFE', 'TMO'],
+		"📈 금융 & 데이터": ['JPM', 'PLTR', 'SNOW']
+	}
 
-st.sidebar.title("⭐ 나의 관심 종목")
-new_ticker = st.sidebar.text_input("새 종목 티커 추가 (예: AMZN, GOOGL)")
+st.sidebar.title("📁 내 포트폴리오")
 
-if st.sidebar.button("리스트에 추가"):
-	new_ticker = new_ticker.upper()
-	if new_ticker and new_ticker not in st.session_state['watchlist']:
-		st.session_state['watchlist'].append(new_ticker)
-		st.sidebar.success(f"{new_ticker} 추가 완료!")
-	elif new_ticker in st.session_state['watchlist']:
-		st.sidebar.warning("이미 리스트에 있는 종목입니다.")
+with st.sidebar.expander("➕ 새 종목/테마 추가하기"):
+	new_theme = st.text_input("테마 이름 (기존 테마 입력 시 추가됨)", "💻 빅테크 & AI")
+	new_ticker = st.text_input("추가할 티커 (예: AMZN)").upper()
+
+	if st.button("리스트에 추가"):
+		if new_ticker:
+			if new_theme not in st.session_state['portfolio']:
+				st.session_state['portfolio'][new_theme] = []
+
+			if new_ticker not in st.session_state['portfolio'][new_theme]:
+				st.session_state['portfolio'][new_theme].append(new_ticker)
+				st.success(f"'{new_theme}' 테마에 {new_ticker} 추가 완료!")
+			else:
+				st.warning("이미 있는 종목입니다.")
 
 st.sidebar.divider()
-st.sidebar.write("👇 분석할 종목을 클릭하세요")
-selected_ticker = st.sidebar.radio("Watchlist", st.session_state['watchlist'], label_visibility="collapsed")
+st.sidebar.write("👇 분석할 테마와 종목을 선택하세요")
+
+selected_theme = st.sidebar.selectbox("📂 관심 테마", list(st.session_state['portfolio'].keys()))
+selected_ticker = st.sidebar.radio(f"{selected_theme} 종목", st.session_state['portfolio'][selected_theme], label_visibility="collapsed")
 
 st.title("주식 AI 분석 앱")
 ticker_symbol = st.text_input("직접 검색하거나 왼쪽 리스트에서 선택하세요:", selected_ticker).upper()
