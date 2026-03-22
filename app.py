@@ -380,7 +380,7 @@ try:
 
 			genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-			model = genai.GenerativeModel('gemini-1.5-flash')
+			model = genai.GenerativeModel('gemini-pro')
 
 			prompt = f"""
 			너는 월스트리트의 수석 주식 분석가야. 다음은 오늘 '{ticker_symbol}' 주식에 대한 최신 영문 뉴스 헤드라인 5개야.
