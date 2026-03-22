@@ -106,7 +106,7 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 					ema_up = up.ewm(com=13, adjust=False).mean()
 					ema_down = down.ewm(com=13, adjust=False).mean()
 					rs = ema_up / ema_down
-					df_temp['RSI'] = 100 - (100 / (	1 + rs))
+					df_temp['RSI'] = 100 - (100 / (1 + rs))
 
 					latest_rsi = df_temp['RSI'].iloc[-1]
 
@@ -115,27 +115,27 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 				except:
 					pass
 
-			if buy_list:
-				try:
-					sender = st.secrets["email"]["sender"]
-					password = st.secrets["email"]["password"]
-					receiver = st.secrets["email"]["receiver"]
+		if buy_list:
+			try:
+				sender = st.secrets["email"]["sender"]
+				password = st.secrets["email"]["password"]
+				receiver = st.secrets["email"]["receiver"]
 
-					email_body = "다음 종목들의 RSI가 30 이하로 떨어졌습니다. 바겐세일 매수 타이밍을 확인하세요!\n\n" + "\n".join(buy_list)
-					msg = MIMEText(email_body)
-					msg['Subject'] = "[주식 AI 봇] 강한 매수 찬스 알림!"
-					msg['From'] = sender
-					msg['To'] = receiver
+				email_body = "다음 종목들의 RSI가 30 이하로 떨어졌습니다. 바겐세일 매수 타이밍을 확인하세요!\n\n" + "\n".join(buy_list)
+				msg = MIMEText(email_body)
+				msg['Subject'] = "[주식 AI 봇] 강한 매수 찬스 알림!"
+				msg['From'] = sender
+				msg['To'] = receiver
 
-					with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-						server.login(sender, password)
-						server.send_message(msg)
+				with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+					server.login(sender, password)
+					server.send_message(msg)
 
-					st.sidebar.success("매수 추천 종목을 이메일로 성공적으로 발송했습니다!")
-				except Exception as e:
-					st.sidebar.error("❌ 이메일 전송 실패! 스트림릿 Secrets 설정을 확인해 주세요.")
-			else:
-				st.sidebar.info("지금은 RSI 30 이하인 바겐세일 종목이 없습니다.")
+				st.sidebar.success("매수 추천 종목을 이메일로 성공적으로 발송했습니다!")
+			except Exception as e:
+				st.sidebar.error("❌ 이메일 전송 실패! 스트림릿 Secrets 설정을 확인해 주세요.")
+		else:
+			st.sidebar.info("지금은 RSI 30 이하인 바겐세일 종목이 없습니다.")
 
 
 st.title("주식 AI 분석 앱")
