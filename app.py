@@ -11,6 +11,7 @@ import re
 import smtplib
 import json
 import firebase_admin
+import google.generativeai as genai
 from firebase_admin import credentials, firestore
 from email.mime.text import MIMEText
 
@@ -355,7 +356,7 @@ try:
 	st.subheader("RSI (상대강도지수) 차트 - 30 밑이면 매수, 70 위면 매도")
 	st.line_chart(df['RSI'].tail(252))
 
-	st.subheader("최신 뉴스 & AI 감성 분석")
+	st.subheader("📰 최신 뉴스 & Gemini AI 3줄 요약")
 
 	try:
 		url = f"https://news.google.com/rss/search?q={ticker_symbol}+stock&hl=en-US&gl=US&ceid=US:en"
@@ -363,25 +364,36 @@ try:
 		response = urllib.request.urlopen(req)
 		root = ET.fromstring(response.read())
 	
-		analyzer = SentimentIntensityAnalyzer()
 		items = root.findall('.//item')
+		news_titles = []
 	
 		if items:
 			for item in items[:5]:
 				title = item.find('title').text
 				link = item.find('link').text
 				publisher = item.find('source').text if item.find('source') is not None else "News"
+				news_titles.append(title)
+				st.markdown(f"- [{title}]({link}) ({publisher})")
 
-				score = analyzer.polarity_scores(title)['compound']
-	
-				if score >= 0.05:
-					sentiment = "🟢 호재 (긍정적)"
-				elif score <= -0.05:
-					sentiment = "🔴 악재 (부정적)"
-				else:
-					sentiment = "⚪ 중립"
+			st.divider()
+			st.write("🧠 **Gemini AI가 뉴스를 분석 중입니다...** ⏳")
 
-				st.markdown(f"- **[{title}]({link})** ({publisher}) ➔ **분석: {sentiment}** (점수: {score:.2f})")
+			genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+			model = genai.GenerativeModel('gemini-1.5-flash')
+
+			prompt = f"""
+			너는 월스트리트의 수석 주식 분석가야. 다음은 오늘 '{ticker_symbol}' 주식에 대한 최신 영문 뉴스 헤드라인 5개야.
+			뉴스: {news_titles}
+
+			이 뉴스들을 종합해서 한국어로 분석해 줘.
+			1. 현재 이 주식의 상황을 아주 쉬운 한국어로 3줄로 요약해.
+			2. 종합적으로 이 뉴스들이 '🟢 호재(상승 기대)', '🔴 악재(하락 주의)', '⚪ 중립' 중 어떤 것에 해당하는지 결론을 내려줘.
+			"""
+
+			response = model.generate_content(prompt)
+			st.info(response.text)
+
 		else:
 			st.write("현재 이 종목에 대한 최신 뉴스가 없습니다.")
 
