@@ -60,6 +60,43 @@ def get_finviz_data(ticker):
 	except:
 		return 0, 0, 0
 
+@st.cache_data(ttl=3600)
+def get_news_and_ai_summary(ticker):
+	url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
+	req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+	response = urllib.request.urlopen(req)
+	root = ET.fromstring(response.read())
+
+	items = root.findall('.//item')
+	if not items:
+		return None, "현재 이 종목에 대한 최신 뉴스가 없습니다."
+
+	news_titles = []
+	news_md_list = []
+	for item in items[:5]:
+		title = item.find('title').text
+		link = item.find('link').text
+		publisher = item.find('source').text if item.find('source') is not None else "News"
+		news_titles.append(title)
+		news_md_list.append(f"- [{title}]({link}) ({publisher})")
+
+	news_markdown = "\n".join(news_md_list)
+
+	genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+	model = genai.GenerativeModel('gemini-2.5-flash')
+
+	prompt = f"""
+	너는 월스트리트의 수석 주식 분석가야. 다음은 오늘 '{ticker}' 주식에 대한 최신 영문 뉴스 헤드라인 5개야.
+	뉴스: {news_titles}
+
+	이 뉴스들을 종합해서 한국어로 분석해 줘.
+	1. 현재 이 주식의 상황을 아주 쉬운 한국어로 3줄로 요약해.
+	2. 종합적으로 이 뉴스들이 '🟢 호재(상승 기대)', '🔴 악재(하락 주의)', '⚪ 중립' 중 어떤 것에 해당하는지 결론을 내려줘.
+	"""
+	ai_response = model.generate_content(prompt)
+
+	return news_markdown, ai_response.text
+
 try:
 	firebase_admin.get_app()
 except ValueError:
@@ -361,46 +398,17 @@ try:
 	st.subheader("📰 최신 뉴스 & Gemini AI 3줄 요약")
 
 	try:
-		url = f"https://news.google.com/rss/search?q={ticker_symbol}+stock&hl=en-US&gl=US&ceid=US:en"
-		req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-		response = urllib.request.urlopen(req)
-		root = ET.fromstring(response.read())
+		news_md, ai_summary = get_news_and_ai_summary(ticker_symbol)
 	
-		items = root.findall('.//item')
-		news_titles = []
-	
-		if items:
-			for item in items[:5]:
-				title = item.find('title').text
-				link = item.find('link').text
-				publisher = item.find('source').text if item.find('source') is not None else "News"
-				news_titles.append(title)
-				st.markdown(f"- [{title}]({link}) ({publisher})")
-
+		if news_md:
+			st.markdown(news_md)
 			st.divider()
-			st.write("🧠 **Gemini AI가 뉴스를 분석 중입니다...** ⏳")
-
-			genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-			model = genai.GenerativeModel('gemini-2.5-flash')
-
-			prompt = f"""
-			너는 월스트리트의 수석 주식 분석가야. 다음은 오늘 '{ticker_symbol}' 주식에 대한 최신 영문 뉴스 헤드라인 5개야.
-			뉴스: {news_titles}
-
-			이 뉴스들을 종합해서 한국어로 분석해 줘.
-			1. 현재 이 주식의 상황을 아주 쉬운 한국어로 3줄로 요약해.
-			2. 종합적으로 이 뉴스들이 '🟢 호재(상승 기대)', '🔴 악재(하락 주의)', '⚪ 중립' 중 어떤 것에 해당하는지 결론을 내려줘.
-			"""
-
-			response = model.generate_content(prompt)
-			st.info(response.text)
-
+			st.write("🧠 **Gemini AI가 뉴스를 분석했습니다.**")
+			st.info(ai_summary)
 		else:
-			st.write("현재 이 종목에 대한 최신 뉴스가 없습니다.")
-
-	except Exception as e:
-		st.warning(f"뉴스를 불러오는 중 문제가 발생했습니다: {e}")
+			st.write(ai_summary)
+	exept Exception as e:
+			st.warning(f"뉴스를 불러오거나 분석하는 중 문제가 발생했습니다: {e}")
 
 	st.subheader("거래량 (Volume)")
 	st.bar_chart(df['Volume'])
