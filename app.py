@@ -83,7 +83,7 @@ def get_news_and_ai_summary(ticker):
 	news_markdown = "\n".join(news_md_list)
 
 	genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-	model = genai.GenerativeModel('gemini-2.5-flash')
+	model = genai.GenerativeModel('gemini-1.5-flash-8b')
 
 	prompt = f"""
 	너는 월스트리트의 수석 주식 분석가야. 다음은 오늘 '{ticker}' 주식에 대한 최신 영문 뉴스 헤드라인 5개야.
