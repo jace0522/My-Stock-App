@@ -100,7 +100,7 @@ def get_news_and_ai_summary(ticker):
 try:
 	firebase_admin.get_app()
 except ValueError:
-	key_dict = json.laods(st.secrets["FIREBASE_KEY"])
+	key_dict = json.loads(st.secrets["FIREBASE_KEY"])
 	cred = credentials.Certificate(key_dict)
 	firebase_admin.initialize_app(cred)
 
