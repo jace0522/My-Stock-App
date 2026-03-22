@@ -397,18 +397,25 @@ try:
 
 	st.subheader("📰 최신 뉴스 & Gemini AI 3줄 요약")
 
-	try:
-		news_md, ai_summary = get_news_and_ai_summary(ticker_symbol)
-	
-		if news_md:
-			st.markdown(news_md)
-			st.divider()
-			st.write("🧠 **Gemini AI가 뉴스를 분석했습니다.**")
-			st.info(ai_summary)
-		else:
-			st.write(ai_summary)
-	except Exception as e:
-			st.warning(f"뉴스를 불러오거나 분석하는 중 문제가 발생했습니다: {e}")
+	if st.button("🚀 Gemini AI 뉴스 3줄 요약 실행하기"):
+		with st.spinner("AI가 월스트리트 뉴스를 싹 다 읽고 있습니다... ⏳"):
+			try:
+				news_md, ai_summary = get_news_and_ai_summary(ticker_symbol)
+
+				if news_md:
+						st.markdown(news_md)
+						st.divider()
+						st.write("🧠 **Gemini AI가 뉴스를 분석했습니다.**")
+						st.info(ai_summary)
+				else:
+						st.write(ai_summary)
+			except Exception as e:
+				if "429" in str(e) or "quota" in str(e).lower():
+					st.warning("⏳ 구글 API 한도를 초과했습니다. 잠시 후 다시 버튼을 눌러주세요!")
+				else:
+					st.warning(f"에러가 발생했습니다: {e}")
+	else:
+		st.info("👆 위 버튼을 누르면 인공지능이 최신 뉴스를 읽고 분석해 줍니다! (할당량 절약 모드)")
 
 	st.subheader("거래량 (Volume)")
 	st.bar_chart(df['Volume'])
