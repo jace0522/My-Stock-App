@@ -33,23 +33,26 @@ def load_data(ticker):
 def get_finviz_data(ticker):
 	try:
 		url = f"https://finviz.com/quote.ashx?t={ticker}"
-		headers = {'User-Agent': 'Mozilla/5.0'}
+		headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 		res = requests.get(url, headers=headers, timeout=5)
 		html = res.text
 
-		pe_match = re.search(r'P/E</td>.*?<b>([^<]+)</b>', html, re.DOTALL)
-		pbr_match = re.search(r'P/B</td>.*?<b>([^<]+)</b>', html, re.DOTALL)
-		target_match = re.search(r'Target Price</td>.*?<b>([^<]+)</b>', html, re.DOTALL)
-		high52_match = re.search(r'52W Range</td>.*?<b>[^<]+ - ([^<]+)</b>', html, re.DOTALL)
+		def extract(label):
+			try:
+				match = re.search(rf'{label}</td>.*?<b>([^<]+)</b>', html, re.DOTALL)
+				if match and match.group(1).strip() not in ['-', 'N/A']:
+					return float(match.group(1).replace(',', ''))
+			except:
+				pass
+			return 0
 
-		pe = float(pe_match.group(1).replace(',', '')) if pe_match and pe_match.group(1) != '-' else 0
-		pbr = float(pbr_match.group(1).replace(',', '')) if pbr_match and pbr_match.group(1) != '-' else 0
-		target = float(target_match.group(1).replace(',', '')) if target_match and target_match.group(1) != '-' else 0
-		high52 = float(high52_match.group(1).replace(',', '')) if high52_match and high52_match.group(1) != '-' else 0
-
-		return pe, pbr, target, high52
+		pe = extract('P/E')
+		pbr = extract('P/B')
+		target = extract('Target Price')
+		
+		return pe, pbr, target
 	except:
-		return 0, 0, 0, 0
+		return 0, 0, 0
 
 if 'watchlist' not in st.session_state:
 	st.session_state['watchlist'] = ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'JPM']
@@ -75,31 +78,31 @@ ticker_symbol = st.text_input("직접 검색하거나 왼쪽 리스트에서 선
 try:
 	df, info = load_data(ticker_symbol)
 
-	current_price = info.get('currentPrice')
+	current_price = info.get('currentPrice') or info.get('regularMarketPrice')
 	if not current_price:
-		current_price = info.get('regularMarketPrice')
-	if not current_price: 
 		current_price = round(df['Close'].iloc[-1], 2)
+	
+	high_52 = info.get('fiftyTwoWeekHigh')
+	if not high_52:
+		high_52 = round(df['High'].tail(252).max(), 2)
 	
 	per = info.get('trailingPE') or 0
 	pbr = info.get('priceToBook') or 0
 	target_price = info.get('targetMeanPrice') or 0
-	high_52 = info.get('fiftyTwoWeekHigh') or 0
-
-	if per == 0 or pbr == 0 or high_52 == 0:
-		fv_pe, fv_pbr, fv_target, fv_high = get_finviz_data(ticker_symbol)
+	
+	if per == 0 or pbr == 0 or target_price == 0:
+		fv_pe, fv_pbr, fv_target = get_finviz_data(ticker_symbol)
 		per = fv_pe if per == 0 else per
 		pbr = fv_pbr if pbr == 0 else pbr
 		target_price = fv_target if target_price == 0 else target_price
-		high_52 = fv_high if high_52 == 0 else high_52
-
+		
 	short_name = info.get('shortName', ticker_symbol)
 	st.subheader(f"🏢 {short_name} 요약 정보")
 
 	col1, col2, col3 = st.columns(3)
 	col1.metric("현재 주가", f"${current_price}")
 	col2.metric("PER (주가수익비율)", f"{per:.2f}" if per > 0 else "N/A")
-	col3.metric("52주 최고가", f"${high_52:.2f}" if high_52 > 0 else "N/A")
+	col3.metric("52주 최고가", f"${high_52:.2f}")
 
 	st.divider()
 
