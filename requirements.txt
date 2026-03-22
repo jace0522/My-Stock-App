@@ -5,3 +5,4 @@ numpy
 scikit-learn
 vaderSentiment
 tensorflow-cpu
+firebase-admin

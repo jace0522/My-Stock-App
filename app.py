@@ -9,6 +9,9 @@ import xml.etree.ElementTree as ET
 import requests
 import re
 import smtplib
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore
 from email.mime.text import MIMEText
 
 from sklearn.preprocessing import MinMaxScaler
@@ -56,19 +59,33 @@ def get_finviz_data(ticker):
 	except:
 		return 0, 0, 0
 
-if 'portfolio' not in st.session_state:
-	st.session_state['portfolio'] = {
-		"💻 빅테크 & AI": ['AAPL', 'MSFT', 'GOOGL'],
-		"🏎️ F1 & 모터스포츠": ['FWONK', 'RACE', 'F'],
-		"🎮 PC 게임 & 하드웨어": ['NVDA', 'AMD', 'EA'],
-		"🧪 화학 & 헬스케어": ['JNJ', 'PFE', 'TMO'],
-		"📈 금융 & 데이터": ['JPM', 'PLTR', 'SNOW']
-	}
+if not firebase_admin._apps:
+	key_dict = json.loads(st.secrets["FIREBASE_KEY"])
+	cred = credentials.Certificate(key_dict)
+	firebase_admin.initialize_app(cred)
 
-st.sidebar.title("📁 내 포트폴리오")
+db = firestore.client()
+doc_ref = db.collection('user_data').document('my_portfolio')
+
+if 'portfolio' not in st.session_state:
+	doc = doc_ref.get()
+	if doc.exists:
+		st.session_state['portfolio'] = doc.to_dict()
+	else:
+		default_portfolio = {
+			"💻 빅테크 & AI": ['AAPL', 'MSFT', 'GOOGL'],
+			"🏎️ F1 & 모터스포츠": ['FWONK', 'RACE', 'F'],
+			"🎮 PC 게임 & 하드웨어": ['NVDA', 'AMD', 'EA'],
+			"🧪 화학 & 헬스케어": ['JNJ', 'PFE', 'TMO'],
+			"📈 금융 & 데이터": ['JPM', 'PLTR', 'SNOW']
+		}
+		st.session_state['portfolio'] = default_portfolio
+		doc_ref.set(default_portfolio)
+
+st.sidebar.title("📁 내 포트폴리오 (DB 연동됨 ☁️)")
 
 with st.sidebar.expander("➕ 새 종목/테마 추가하기"):
-	new_theme = st.text_input("테마 이름 (기존 테마 입력 시 추가됨)", "💻 빅테크 & AI")
+	new_theme = st.text_input("테마 이름", "💻 빅테크 & AI")
 	new_ticker = st.text_input("추가할 티커 (예: AMZN)").upper()
 
 	if st.button("리스트에 추가"):
@@ -78,7 +95,10 @@ with st.sidebar.expander("➕ 새 종목/테마 추가하기"):
 
 			if new_ticker not in st.session_state['portfolio'][new_theme]:
 				st.session_state['portfolio'][new_theme].append(new_ticker)
-				st.success(f"'{new_theme}' 테마에 {new_ticker} 추가 완료!")
+
+				doc_ref.set(st.session_state['portfolio'])
+
+				st.success(f"'{new_theme}' 테마에 {new_ticker} 추가 완료! (DB 저장됨)")
 			else:
 				st.warning("이미 있는 종목입니다.")
 
