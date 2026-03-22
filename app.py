@@ -407,7 +407,7 @@ try:
 			st.info(ai_summary)
 		else:
 			st.write(ai_summary)
-	exept Exception as e:
+	except Exception as e:
 			st.warning(f"뉴스를 불러오거나 분석하는 중 문제가 발생했습니다: {e}")
 
 	st.subheader("거래량 (Volume)")
