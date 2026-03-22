@@ -60,8 +60,10 @@ def get_finviz_data(ticker):
 	except:
 		return 0, 0, 0
 
-if not firebase_admin._apps:
-	key_dict = json.loads(st.secrets["FIREBASE_KEY"])
+try:
+	firebase_admin.get_app()
+except ValueError:
+	key_dict = json.laods(st.secrets["FIREBASE_KEY"])
 	cred = credentials.Certificate(key_dict)
 	firebase_admin.initialize_app(cred)
 
