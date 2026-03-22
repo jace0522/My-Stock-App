@@ -106,7 +106,7 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 					ema_up = up.ewm(com=13, adjust=False).mean()
 					ema_down = down.ewm(com=13, adjust=False).mean()
 					rs = ema_up / ema_down
-					df_temp['RSI'] = 100 - (100 / 1 + rs))
+					df_temp['RSI'] = 100 - (100 / (	1 + rs))
 
 					latest_rsi = df_temp['RSI'].iloc[-1]
 
