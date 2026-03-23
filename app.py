@@ -694,36 +694,46 @@ try:
 	st.write("최근 데이터 확인하기:")
 	st.dataframe(df.tail())
 
-st.divider()
-	
-	st.subheader("💬 내 주식 전담 AI 비서")
-	st.write(f"**{ticker_symbol}({short_name})** 종목이나 투자 전략에 대해 무엇이든 물어보세요!")
+	st.divider()
 
+	# --- ✨ 궁극기 1: 내 주식 전담 AI 비서 (Chat UI) ---
+	st.subheader("💬 내 주식 전담 AI 비서")
+	st.write(f"**{ticker_symbol}** 종목이나 투자 전략에 대해 무엇이든 물어보세요!")
+
+	# 채팅 기록을 세션에 저장 (화면을 새로고침해도 대화 내용이 유지되도록)
 	if "chat_history" not in st.session_state:
 		st.session_state.chat_history = []
 
+	# 1. 기존 채팅 기록 화면에 뿌려주기
 	for msg in st.session_state.chat_history:
 		with st.chat_message(msg["role"]):
 			st.markdown(msg["content"])
 
-	if chat_input := st.chat_input(f"{short_name}의 향후 전망을 분석해 줘!"):
+	# 2. 유저가 입력창에 질문을 쳤을 때 실행되는 로직
+	if chat_input := st.chat_input("이 주식의 향후 전망을 분석해 줘!"):
+		# 유저 질문을 화면에 띄우고 기록장부에 저장
 		st.session_state.chat_history.append({"role": "user", "content": chat_input})
 		with st.chat_message("user"):
 			st.markdown(chat_input)
 
+		# AI 비서의 답변 생성!
 		with st.chat_message("assistant"):
 			with st.spinner("AI 비서가 차트와 뉴스를 분석하며 답변을 작성 중입니다... ✍️"):
 				try:
+					# 넉넉한 3세대 모델 출동!
 					chat_model = genai.GenerativeModel('gemini-3-flash-preview')
 					
-					system_prompt = f"너는 월스트리트 수석 퀀트 분석가이자 친절한 주식 멘토야. 현재 사용자는 '{ticker_symbol}({short_name})' 주식 데이터를 보고 있어. 질문에 전문적이고 친절하게 대답해 줘. 질문: {chat_input}"
+					# AI에게 현재 유저가 어떤 종목을 보고 있는지 은슬쩍 알려주는 프롬프트 엔지니어링!
+					system_prompt = f"너는 월스트리트 수석 퀀트 분석가이자 친절한 주식 멘토야. 현재 사용자는 '{ticker_symbol}' 주식 데이터를 보고 있어. 질문에 전문적이고 친절하게 대답해 줘. 질문: {chat_input}"
 					
 					response = chat_model.generate_content(system_prompt)
 					
+					# 답변 출력 및 기록장부에 저장
 					st.markdown(response.text)
 					st.session_state.chat_history.append({"role": "assistant", "content": response.text})
-				except Exception as e:
-					st.error(f"앗, AI 응답에 문제가 생겼습니다! API 한도나 네트워크를 확인해 주세요. (에러: {e})")
+				except Exception as chat_e:
+					st.error(f"앗, AI 응답에 문제가 생겼습니다! API 한도나 네트워크를 확인해 주세요. (에러: {chat_e})")
 
+# 앱 전체의 try문을 닫아주는 아주 중요한 마지막 줄! (들여쓰기 없음)
 except Exception as e:
 	st.error(f"데이터를 불러오는 데 실패했습니다. (에러: {e})")
