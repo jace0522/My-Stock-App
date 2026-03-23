@@ -391,6 +391,54 @@ try:
 
 	st.divider()
 
+	st.subheader("🕸️ 포트폴리오 종목 상관관계 (분산투자 리스크 점검)")
+	st.write("내 포트폴리오의 주식들이 서로 얼마나 비슷하게 움직이는지 확인해 보세요.")
+
+	if st.button("📊 상관관계 히트맵 그리기"):
+		with st.spinner("포트폴리오 전체 데이터를 수학적으로 분석 중입니다... ⏳"):
+			try:
+				all_tickers = []
+				for theme, tickers in st.session_state[''portfolio'].items():
+					all_tickers.extend(tickers)
+				all_tickers = list(set(all_tickers))
+
+				if len(all_tickers) > 1:
+					close_prices = pd.DataFrame()
+					for t in all_tickers:
+						df_temp, _ = load_data(t)
+						if not df_temp.empty:
+							close_prices[t] = df_temp['Close']
+
+					returns = close_prices.pct_change().dropna()
+					corr_matrix = returns.corr()
+
+					fig_corr = go.Figure(data=go.Heatmap(
+						z=corr_matrix.values,
+						x=corr_matrix.columns,
+						y=corr_matrix.index,
+						colorscale='RdBu_r',
+						zmin=-1, zmax=1,
+						text=np.round(corr_matrix.values, 2),
+						texttemplate="%{text}",
+						hoverinfo="text"
+					))
+
+					fig_corr.update_layout(
+						template="plotly_dark",
+						height=500,
+						margin=dict(l=20, r=20, t=20, b=20)
+					)
+					
+					st.plotly_chart(fig_corr, use_container_width=True)
+
+					st.info(💡 **데이터 해석 꿀팁:**\n* **빨간색(1.0)에 가까울수록:** 두 주식이 완전히 똑같이 움직인다는 뜻! (위험 분산 안 됨)\n* **파란색(-1.0)에 가까울수록:** 두 주식이 반대로 움직인다는 뜻! (시장 폭락 시 방어력 좋음)\n* **흰색(0)에 가까울수록:** 서로 전혀 상관없이 움직인다는 뜻입니다.")
+				else:
+					st.warning("상관관계를 분석하려면 포트폴리오에 최소 2개 이상의 종목이 있어야 합니다!")
+			except Exception as e:
+				st.error(f"데이터 분석 중 에러가 발생했습니다: {e}")
+
+	st.divider()
+
 	st.subheader("퀀트 투자 시뮬레이션 (백테스팅)")
 	st.write("💡 **조건** 지난 2년간 RSI가 30 이하일 때 1,000달러를 전량 매수하고, 70 이상일 때 전량 매도했다면?")
 
