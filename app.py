@@ -269,6 +269,10 @@ if search_keyword and search_keyword != selected_ticker:
 try:
 	df, info = load_data(ticker_symbol)
 
+	if df.empty:
+		st.warning("⚠️ 주가 데이터를 찾을 수 없습니다. 아래 드롭다운에서 정확한 종목을 선택하거나, 올바른 티커(예: AAPL)를 입력해 주세요!")
+		st.stop()
+
 	current_price = info.get('currentPrice') or info.get('regularMarketPrice')
 	if not current_price:
 		current_price = round(df['Close'].iloc[-1], 2)
