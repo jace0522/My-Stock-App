@@ -107,6 +107,20 @@ except ValueError:
 db = firestore.client()
 doc_ref = db.collection('user_data').document('my_portfolio')
 
+account_ref = db.collection('user_data').document('my_account')
+
+if 'account' not in st.session_state:
+	acc_doc = account_ref.get()
+	if acc_doc.exists:
+		st.session_state['account'] = acc_doc.to_dict()
+	else:
+		default_account = {
+			"cash": 10000.0,
+			"holdings": {}
+		}
+		st.session_state['account'] = default_account
+		account_ref.set(default_account)
+
 if 'portfolio' not in st.session_state:
 	doc = doc_ref.get()
 	if doc.exists:
@@ -199,6 +213,22 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 
 
 st.title("주식 AI 분석 앱")
+
+with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
+	my_cash = st.session_state['account']['cash']
+	my_holdings = st.session_state['account']['holdings']
+
+	st.write(f"💵 **보유 현금:** ${my_cash:,.2f}")
+
+	if my_holdings:
+		st.write(📦 **보유 주식:**")
+		for ticker, info in my_holdings.items():
+				st.write(f"- **{ticker}**: {info['shares']}주 (평단가: ${info['avg_price']:,.2f})")
+	else:
+		st.info("현재 보유 중인 주식이 없습니다. 맘에 드는 종목을 매수해 보세요!")
+
+st.divider()
+
 ticker_symbol = st.text_input("직접 검색하거나 왼쪽 리스트에서 선택하세요:", selected_ticker).upper()
 
 try:
@@ -229,6 +259,50 @@ try:
 	col1.metric("현재 주가", f"${current_price}")
 	col2.metric("PER (주가수익비율)", f"{per:.2f}" if per > 0 else "N/A")
 	col3.metric("52주 최고가", f"${high_52:.2f}")
+
+	st.write("### 모의투자 매수 / 매도")
+
+	trade_col1, trade_col2, trade_col3 = st.columns([1, 1, 2])
+
+	trade_shares = trade_col1.number_input("수량", min_value=1, value=1, step=1)
+	total_trade_amount = trade_shares * current_price
+	trade_col3.info(f"💰 총 예상 금액: **${total_trade_amount:,.2f}**\n\n(내 잔고: ${st.session_state['account']['cash']:,.2f})")
+
+	if trade_col1.button("🟢 매수 (Buy)", use_container_width=True):
+		if st.session_state['account']['cash'] >= total_trade_amount:
+			st.session_state['account']['cash'] -= total_trade_amount
+
+			holdings = st.session_state['account']['holdings']
+			if ticker_symbol in holdings:
+				old_shares = holdings[ticker_symbol]['shares']
+				old_avg = holdings[ticker_symbol]['avg_price']
+				new_shares = old_shares + trade_shares
+				new_avg = ((old_shares * old_avg) + total_trade_amount) / new_shares
+				holdings[ticker_symbol]['shares'] = new_shares
+				holdings[ticker_symbol]['avg_price'] = new_avg
+			else:
+				holdings[ticker_symbol] = {'shares': trade_shares, 'avg_price': current_price}
+
+			account_ref.set(st.session_state['account'])
+			st.success(f"🎉 {ticker_symbol} {trade_shares}주 매수 완료! (DB 저장됨)")
+			st.rerun()
+		else:
+			st.error("잔고가 부족합니다!😅")
+
+	if trade_col2.button("🔴 매도 (Sell)", use_container_width=True):
+		holdings = st.session_state['account']['holdings']
+		if ticker_symbol in holdings and holdings[ticker_symbol]['shares'] >= trade_shares:
+			st.session_state['account']['cash'] += total_trade_amount
+
+			holdings[ticker_symbol]['shares'] -= trade_shares
+			if holdings[ticker_symbol]['shares'] == 0:
+				del holdings[ticker_symbol]
+
+			account_ref.set(st.session_state['account'])
+			st.success(f"💸 {ticker_symbol} {trade_shares}주 매도 완료! (DB 저장됨)")
+			st.rerun()
+		else:
+			st.error("보유한 주식 수량이 부족합니다! 🤔")
 
 	st.divider()
 
