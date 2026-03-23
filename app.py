@@ -221,7 +221,7 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	st.write(f"💵 **보유 현금:** ${my_cash:,.2f}")
 
 	if my_holdings:
-		st.write(📦 **보유 주식:**")
+		st.write("📦 **보유 주식:**")
 		for ticker, info in my_holdings.items():
 				st.write(f"- **{ticker}**: {info['shares']}주 (평단가: ${info['avg_price']:,.2f})")
 	else:
