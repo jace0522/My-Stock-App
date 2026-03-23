@@ -574,6 +574,11 @@ try:
 
 				st.divider()
 
+			except Exception as e:
+				st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
+
+	st.divider()
+
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
 
