@@ -63,6 +63,27 @@ def get_finviz_data(ticker):
 		return 0, 0, 0
 
 @st.cache_data(ttl=3600)
+def get_naver_finance_data(ticker):
+	try:
+		# 티커에서 종목코드만 분리 (예: 005930.KS -> 005930)
+		code = ticker.split('.')[0]
+		url = f"https://finance.naver.com/item/main.naver?code={code}"
+		headers = {'User-Agent': 'Mozilla/5.0'}
+		res = requests.get(url, headers=headers, timeout=5)
+		html = res.text
+
+		# 네이버 증권 페이지에서 정규식(Regex)으로 PER, PBR 숫자만 쏙 빼오기
+		pe_match = re.search(r'<em id="_per">([^<]+)</em>', html)
+		pb_match = re.search(r'<em id="_pbr">([^<]+)</em>', html)
+
+		pe = float(pe_match.group(1).replace(',', '')) if pe_match else 0
+		pb = float(pb_match.group(1).replace(',', '')) if pb_match else 0
+		
+		return pe, pb
+	except:
+		return 0, 0
+
+@st.cache_data(ttl=3600)
 def get_exchange_rate():
 	with st.spinner("🌍 실시간 원/달러 환율을 가져오는 중..."):
 		try:
@@ -433,15 +454,27 @@ try:
 	if not high_52:
 		high_52 = round(df['High'].tail(252).max(), 2)
 	
+	# --- ✨ 국적별 PER/PBR 수집 로직 ---
 	per = info.get('trailingPE') or 0
 	pbr = info.get('priceToBook') or 0
 	target_price = info.get('targetMeanPrice') or 0
 	
-	if per == 0 or pbr == 0 or target_price == 0:
-		fv_pe, fv_pbr, fv_target = get_finviz_data(ticker_symbol)
-		per = fv_pe if per == 0 else per
-		pbr = fv_pbr if pbr == 0 else pbr
-		target_price = fv_target if target_price == 0 else target_price
+	# 주식이 한국(KS, KQ)인지 미국인지 판별
+	is_kr = ticker_symbol.endswith('.KS') or ticker_symbol.endswith('.KQ')
+
+	if is_kr:
+		# 🇰🇷 한국 주식은 네이버 증권(Plan C) 출동!
+		if per == 0 or pbr == 0:
+			nv_pe, nv_pb = get_naver_finance_data(ticker_symbol)
+			per = nv_pe if per == 0 else per
+			pbr = nv_pb if pbr == 0 else pbr
+	else:
+		# 🇺🇸 미국 주식은 기존처럼 핀비즈(Plan B) 출동!
+		if per == 0 or pbr == 0 or target_price == 0:
+			fv_pe, fv_pbr, fv_target = get_finviz_data(ticker_symbol)
+			per = fv_pe if per == 0 else per
+			pbr = fv_pbr if pbr == 0 else pbr
+			target_price = fv_target if target_price == 0 else target_price
 		
 	# --- ✨ 원화/달러 자동 인식 및 실시간 환율 적용 로직 ---
 	is_kr = ticker_symbol.endswith('.KS') or ticker_symbol.endswith('.KQ')
