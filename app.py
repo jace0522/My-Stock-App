@@ -141,7 +141,7 @@ if 'portfolio' not in st.session_state:
 		for theme, items in port_data.items():
 			if isinstance(items, list):
 				port_data[theme] = {ticker: ticker for ticker in items}
-		st.session_state['portfolio] = port_data
+		st.session_state['portfolio'] = port_data
 		doc_ref.set(port_data)
 	else:
 		default_portfolio = {
