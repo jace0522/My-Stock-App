@@ -311,6 +311,69 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 
 st.divider()
 
+st.subheader("🔎 내 포트폴리오 조건검색기 (스캐너)")
+with st.expander("🤖 포트폴리오 전체 종목 스캔하기 (클릭!)"):
+	st.write("내 관심 종목 중 현재 살만한 타이밍인 주식이 있는지 한 번에 찾아보세요!")
+	
+	filter_col1, filter_col2 = st.columns(2)
+	rsi_condition = filter_col1.selectbox("📊 RSI (매수/매도 타이밍)", ["상관없음", "🟢 RSI 30 이하 (과매도/바겐세일 찬스!)", "🔴 RSI 70 이상 (과매수/거품 주의!)"])
+	macd_condition = filter_col2.selectbox("📈 MACD (추세 방향)", ["상관없음", "🟢 MACD > Signal (상승 추세 시작)", "🔴 MACD < Signal (하락 추세 시작)"])
+
+	if st.button("🔍 위 조건으로 전체 스캔 실행", type="primary"):
+		with st.spinner("월스트리트 데이터를 긁어와 전체 종목을 수학적으로 분석 중입니다... ⏳"):
+			results = []
+			
+			for theme, tickers_dict in st.session_state['portfolio'].items():
+				for t_ticker, t_name in tickers_dict.items():
+					try:
+						df_temp, _ = load_data(t_ticker)
+						if df_temp.empty: continue
+
+						delta = df_temp['Close'].diff()
+						up = delta.clip(lower=0)
+						down = -1 * delta.clip(upper=0)
+						ema_up = up.ewm(com=13, adjust=False).mean()
+						ema_down = down.ewm(com=13, adjust=False).mean()
+						rs = ema_up / ema_down
+						df_temp['RSI'] = 100 - (100 / (1 + rs))
+
+						exp1 = df_temp['Close'].ewm(span=12, adjust=False).mean()
+						exp2 = df_temp['Close'].ewm(span=26, adjust=False).mean()
+						macd = exp1 - exp2
+						signal = macd.ewm(span=9, adjust=False).mean()
+
+						latest_price = df_temp['Close'].iloc[-1]
+						latest_rsi = df_temp['RSI'].iloc[-1]
+						latest_macd = macd.iloc[-1]
+						latest_signal = signal.iloc[-1]
+
+						pass_rsi = True
+						if "RSI 30 이하" in rsi_condition and latest_rsi > 30: pass_rsi = False
+						if "RSI 70 이상" in rsi_condition and latest_rsi < 70: pass_rsi = False
+
+						pass_macd = True
+						if "MACD > Signal" in macd_condition and latest_macd <= latest_signal: pass_macd = False
+						if "MACD < Signal" in macd_condition and latest_macd >= latest_signal: pass_macd = False
+
+						if pass_rsi and pass_macd:
+							results.append({
+								"테마": theme,
+								"종목명": t_name,
+								"티커": t_ticker,
+								"현재가": f"${latest_price:.2f}",
+								"RSI": round(latest_rsi, 2),
+								"MACD": "상승세 🟢" if latest_macd > latest_signal else "하락세 🔴"
+							})
+					except:
+						pass # 에러나는 종목은 조용히 패스
+
+			if results:
+				st.success(f"🎉 삐빅! 조건에 딱 맞는 종목 {len(results)}개를 찾았습니다!")
+				st.dataframe(pd.DataFrame(results), use_container_width=True)
+			else:
+				st.warning("🥲 현재 설정한 조건에 맞는 종목이 없습니다. 조건을 '상관없음'으로 조금 완화해 보세요!")
+st.divider()
+
 search_keyword = st.text_input("🔍 기업명(예: 애플, 삼성전자, Tesla) 또는 티커를 입력하세요:", selected_ticker)
 
 ticker_symbol = search_keyword.upper()
