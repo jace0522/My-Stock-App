@@ -241,7 +241,30 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 
 st.divider()
 
-ticker_symbol = st.text_input("직접 검색하거나 왼쪽 리스트에서 선택하세요:", selected_ticker).upper()
+search_keyword = st.text_input("🔍 기업명(예: 애플, 삼성전자, Tesla) 또는 티커를 입력하세요:", selected_ticker)
+
+ticker_symbol = search_keyword.upper()
+
+if search_keyword and search_keyword != selected_ticker:
+	with st.spinner("글로벌 주식 DB에서 종목을 찾는 중입니다... 🌍"):
+		search_url = f"https://query2.finance.yahoo.com/v1/finance/search?q={search_keyword}"
+		headers = {'User-Agent': 'Mozilla/5.0'}
+		try:
+			res = requests.get(search_url, headers=headers, timeout=5)
+			quotes = res.json().get('quotes', [])
+
+			if quotes:
+				options = [f"{q['symbol']} - {q.get('shortname', q.get('longname', '이름 없음'))} ({q.get('exchange', 'N/A')})"
+					for q in quotes if q.get('quoteType') in ['EQUITY', 'ETF']]
+
+				if options:
+					selected_option = st.selectbox("👇 아래 검색 결과에서 정확한 종목을 선택하세요!", options)
+					ticker_symbol = selected_option.split(' ')[0]
+
+				else:
+					st.warning("일치하는 주식/ETF를 찾을 수 없습니다. 영문이나 티커로 다시 검색해 보세요.")
+		except Exception as e:
+			st.warning("검색 서버에 연결할 수 없습니다. 티커(예: AAPL)를 직접 입력해 주세요.")
 
 try:
 	df, info = load_data(ticker_symbol)
