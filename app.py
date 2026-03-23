@@ -523,14 +523,35 @@ try:
 			try:
 				stock_obj = yf.Ticker(ticker_symbol)
 				financials = stock_obj.financials
+				balance_sheet = stock_obj.balance_sheet # 빚 계산용 장부 추가
+				cashflow = stock_obj.cashflow # 현금흐름용 장부 추가
 				
+				fund_info = stock_obj.info
+				
+				# ✨ 1. 야후가 요약본을 안 주면? 원본 장부에서 우리가 직접 계산해버리기!
+				margin = fund_info.get('profitMargins', 0) * 100 if fund_info.get('profitMargins') else 0
+				if margin == 0 and not financials.empty:
+					try: margin = (financials.loc['Net Income'].iloc[0] / financials.loc['Total Revenue'].iloc[0]) * 100
+					except: pass
+					
+				roe = fund_info.get('returnOnEquity', 0) * 100 if fund_info.get('returnOnEquity') else 0
+				if roe == 0:
+					try: roe = (financials.loc['Net Income'].iloc[0] / balance_sheet.loc['Stockholders Equity'].iloc[0]) * 100
+					except: pass
+					
+				debt_to_eq = fund_info.get('debtToEquity', 0) if fund_info.get('debtToEquity') else 0
+				if debt_to_eq == 0:
+					try: debt_to_eq = (balance_sheet.loc['Total Debt'].iloc[0] / balance_sheet.loc['Stockholders Equity'].iloc[0]) * 100
+					except: pass
+					
+				op_cashflow = fund_info.get('operatingCashflow', 0) if fund_info.get('operatingCashflow') else 0
+				if op_cashflow == 0:
+					try: op_cashflow = cashflow.loc['Operating Cash Flow'].iloc[0]
+					except: pass
+
+				# 2. 계산된 핵심 재무 지표 화면에 띄우기
 				st.write("💡 **핵심 펀더멘털 지표**")
 				f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-				
-				margin = info.get('profitMargins', 0) * 100 if info.get('profitMargins') else 0
-				roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') else 0
-				debt_to_eq = info.get('debtToEquity', 0) if info.get('debtToEquity') else 0
-				op_cashflow = info.get('operatingCashflow', 0) if info.get('operatingCashflow') else 0
 				
 				if margin >= 20:
 					f_col1.success(f"순이익률\n\n**{margin:.1f}%** (마진 끝판왕 👑)")
@@ -552,26 +573,6 @@ try:
 				f_col4.metric("영업활동 현금흐름", cf_str)
 
 				st.divider()
-
-				st.write("📈 **최근 4년 매출액 vs 당기순이익 성적표** (우상향하는 기업이 최고!)")
-				if not financials.empty:
-					fin_df = financials.T.head(4)[::-1] # 최근 4년치 추출 후 과거->현재 순으로 시간순 배열
-					
-					if 'Total Revenue' in fin_df.columns and 'Net Income' in fin_df.columns:
-						chart_data = pd.DataFrame({
-							'매출액 (Revenue)': fin_df['Total Revenue'],
-							'당기순이익 (Net Income)': fin_df['Net Income']
-						})
-						st.bar_chart(chart_data)
-					else:
-						st.info("이 종목은 상세 매출/이익 차트를 제공하지 않습니다.")
-				else:
-					st.info("재무제표 데이터가 없습니다. (ETF나 상장 폐지 종목일 수 있습니다.)")
-
-			except Exception as e:
-				st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
-	
-	st.divider()
 
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
