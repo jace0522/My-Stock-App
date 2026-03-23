@@ -228,7 +228,12 @@ with st.sidebar.expander("🗑️ 잘못 추가된 종목 삭제하기"):
 st.sidebar.divider()
 st.sidebar.write("👇 분석할 테마와 종목을 선택하세요")
 
-selected_theme = st.sidebar.selectbox("📂 관심 테마", list(st.session_state['portfolio'].keys()))
+theme_list = list(st.session_state['portfolio'].keys())
+target_theme = "💻 빅테크 & AI"
+
+default_idx = theme_list.index(target_theme) if target_theme in theme_list else 0
+
+selected_theme = st.sidebar.selectbox("📂 관심 테마", theme_list, index=default_idx)
 
 theme_dict = st.session_state['portfolio'][selected_theme]
 
