@@ -247,10 +247,10 @@ ticker_symbol = search_keyword.upper()
 
 if search_keyword and search_keyword != selected_ticker:
 	with st.spinner("글로벌 주식 DB에서 종목을 찾는 중입니다... 🌍"):
-		search_url = f"https://query2.finance.yahoo.com/v1/finance/search?q={search_keyword}"
+		search_url = "https://query2.finance.yahoo.com/v1/finance/search"
 		headers = {'User-Agent': 'Mozilla/5.0'}
 		try:
-			res = requests.get(search_url, headers=headers, timeout=5)
+			res = requests.get(search_url, params={'q': search_keyword.strip()}, headers=headers, timeout=5)
 			quotes = res.json().get('quotes', [])
 
 			if quotes:
@@ -260,11 +260,15 @@ if search_keyword and search_keyword != selected_ticker:
 				if options:
 					selected_option = st.selectbox("👇 아래 검색 결과에서 정확한 종목을 선택하세요!", options)
 					ticker_symbol = selected_option.split(' ')[0]
-
 				else:
 					st.warning("일치하는 주식/ETF를 찾을 수 없습니다. 영문이나 티커로 다시 검색해 보세요.")
+					st.stop()
+			else:
+				st.warning("야후 파이낸스에서 해당 종목을 찾을 수 없습니다.")
+				st.stop()
 		except Exception as e:
 			st.warning("검색 서버에 연결할 수 없습니다. 티커(예: AAPL)를 직접 입력해 주세요.")
+			st.stop()
 
 try:
 	df, info = load_data(ticker_symbol)
