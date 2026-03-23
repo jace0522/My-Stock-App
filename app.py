@@ -151,24 +151,63 @@ if 'portfolio' not in st.session_state:
 
 st.sidebar.title("📁 내 포트폴리오 (DB 연동됨 ☁️)")
 
-with st.sidebar.expander("➕ 새 종목/테마 추가하기"):
+with st.sidebar.expander("➕ 새 종목/테마 검색해서 추가하기"):
 	new_theme = st.text_input("테마 이름", "💻 빅테크 & AI")
-	new_ticker = st.text_input("추가할 티커 (예: AMZN)").upper()
+	search_add_keyword = st.text_input("🔍 기업명 검색 (예: SK HYNIX, TESLA)")
+
+	target_ticker_to_add = None
+
+	if search_add_keyword:
+		search_url = "https://query2.finance.yahoo.com/v1/finance/search"
+		headers = {'User-Agent': 'Mozilla/5.0'}
+		params = {'q': search_add_keyword.strip(), 'lang': 'ko', 'region': 'KR', 'quotesCount': 5}
+		try:
+			res = requests.get(search_url, params=params, headers=headers, timeout=5)
+			quotes = res.json().get('quotes', [])
+			if quotes:
+				options = [f"{q['symbol']} - {q.get('shortname', q.get('longname', '이름 없음'))}" for q in quotes if q.get('quoteType') in ['EQUITY', 'ETF']]
+				if options:
+					selected_add_option = st.selectbox("👇 추가할 종목 선택", options)
+					target_ticker_to_add = selected_add_option.split(' ')[0]
+				else:
+					st.warning("일치하는 주식/ETF가 없습니다.")
+			else:
+				st.warning("검색 결과가 없습니다.")	
+		except:
+			st.warning("검색 중 오류가 발생했습니다.")
 
 	if st.button("리스트에 추가"):
-		if new_ticker:
+		if target_ticker_to_add:
 			if new_theme not in st.session_state['portfolio']:
 				st.session_state['portfolio'][new_theme] = []
 
-			if new_ticker not in st.session_state['portfolio'][new_theme]:
-				st.session_state['portfolio'][new_theme].append(new_ticker)
-
+			if target_ticker_to_add not in st.session_state['portfolio'][new_theme]:
+				st.session_state['portfolio'][new_theme].append(target_ticker_to_add)
 				doc_ref.set(st.session_state['portfolio'])
-
-				st.success(f"'{new_theme}' 테마에 {new_ticker} 추가 완료! (DB 저장됨)")
+				st.success(f"'{new_theme}' 테마에 {target_ticker_to_add} 추가 완료!")
+				st.rerun()
 			else:
 				st.warning("이미 있는 종목입니다.")
+		else:
+			st.error("먼저 검색창에서 종목을 찾아 선택해주세요!")
 
+with st.sidebar.expander("🗑️ 잘못 추가된 종목 삭제하기"):
+	del_theme = st.selectbox("삭제할 테마 선택", list(st.session_state['portfolio'].keys()), key="del_theme")
+
+	if st.session_state['portfolio'][del_theme]:
+		del_ticker = st.selectbox("삭제할 종목 선택", st.session_state['portfolio'][del_theme], key="del_ticker")
+
+	if st.button("❌ 이 종목 지우기"):
+		st.session_state['portfolio'][del_theme].remove(del_ticker)
+
+		if len(st.session_state['portfolio'][del_theme]) == 0:
+			del st.session_state['portfolio'][del_theme]
+
+		doc_ref.set(st.session_state['portfolio'])
+		st.success(f"'{del_ticker}' 삭제 완료!")
+		st.rerun()
+	else:
+		st.info("이 테마에는 삭제할 종목이 없습니다.")
 st.sidebar.divider()
 st.sidebar.write("👇 분석할 테마와 종목을 선택하세요")
 
