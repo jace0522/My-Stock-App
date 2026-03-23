@@ -477,7 +477,7 @@ try:
 		name='주가 캔들'
 	)])
 
-	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['20일_이동평균'], mode='lines', name='20일 이동평균', line=dict(color='orange', width=1.5)))\
+	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['20일_이동평균'], mode='lines', name='20일 이동평균', line=dict(color='orange', width=1.5)))
 	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['60일_이동평균'], mode='lines', name='60일 이동평균', line=dict(color='blue', width=1.5)))
 
 	fig.update_layout(
