@@ -63,6 +63,18 @@ def get_finviz_data(ticker):
 		return 0, 0, 0
 
 @st.cache_data(ttl=3600)
+def get_exchange_rate():
+	with st.spinner("🌍 실시간 원/달러 환율을 가져오는 중..."):
+		try:
+			# 야후 파이낸스에서 원/달러(USDKRW) 실시간 데이터 가져오기
+			rate_data = yf.Ticker("KRW=X")
+			current_rate = float(rate_data.history(period="1d")['Close'].iloc[-1])
+			return current_rate
+		except:
+			st.warning("환율을 불러오지 못해 임시 환율(1450원)을 적용합니다.")
+			return 1450.0
+
+@st.cache_data(ttl=3600)
 def get_news_and_ai_summary(ticker):
 	url = f"https://news.google.com/rss/search?q={ticker}+stock&hl=en-US&gl=US&ceid=US:en"
 	req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -431,9 +443,11 @@ try:
 		pbr = fv_pbr if pbr == 0 else pbr
 		target_price = fv_target if target_price == 0 else target_price
 		
-	# --- ✨ 원화/달러 자동 인식 및 환율 적용 로직 ---
+	# --- ✨ 원화/달러 자동 인식 및 실시간 환율 적용 로직 ---
 	is_kr = ticker_symbol.endswith('.KS') or ticker_symbol.endswith('.KQ')
-	KRW_RATE = 1350.0 # 1달러 = 1350원 (고정 환율)
+	
+	# 이제 하드코딩된 숫자가 아니라 실시간 환율을 가져옵니다!
+	KRW_RATE = get_exchange_rate()
 
 	def fmt_price(val):
 		if is_kr: return f"₩{val:,.0f}"
