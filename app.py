@@ -689,42 +689,87 @@ try:
 
 	st.divider()
 
-	st.subheader("퀀트 투자 시뮬레이션 (백테스팅)")
-	st.write("💡 **조건** 지난 2년간 RSI가 30 이하일 때 1,000달러를 전량 매수하고, 70 이상일 때 전량 매도했다면?")
+	st.subheader("🧪 현실 고증 퀀트 시뮬레이션 (세금/수수료 반영)")
+	st.write("💡 **조건:** 지난 2년간 RSI 30 이하에서 전량 매수, 70 이상에서 전량 매도할 때, 현실의 비용을 떼고 내 손에 남는 진짜 돈은?")
 
-	capital = 1000 # 시작 금액 1,000달러
+	with st.expander("⚙️ 현실 세계 마찰력 설정 (슬리피지, 수수료, 세금)", expanded=True):
+		sim_col1, sim_col2, sim_col3 = st.columns(3)
+		capital = sim_col1.number_input("초기 투자 금액 ($)", min_value=1000, value=10000, step=1000)
+		commission = sim_col2.number_input("증권사 거래 수수료 (%)", min_value=0.0, max_value=1.0, value=0.07, step=0.01) # 보통 0.07% 정도
+		slippage = sim_col3.number_input("슬리피지 오차 (%)", min_value=0.0, max_value=2.0, value=0.1, step=0.05) # 시장가 매매 시 오차
+		
+		st.caption("※ 한국 거주자 기준: 해외주식 매매차익은 연 250만 원(약 $1,850) 공제 후 22% 양도소득세 부과")
+
 	cash = capital
 	shares = 0
+	total_fees_paid = 0 # 증권사에 낸 수수료 총합
 
 	for i in range(len(df)):
 		price = df['Close'].iloc[i]
 		rsi = df['RSI'].iloc[i]
 
-		if rsi <= 30 and cash > 0: # 매수
-			shares = cash / price
+		# 🟢 매수 로직 (현실 반영)
+		if rsi <= 30 and cash > 0: 
+			# 1. 슬리피지 적용: 내가 본 가격보다 미세하게 '비싸게' 사짐
+			buy_price = price * (1 + (slippage / 100))
+			
+			# 2. 수수료 차감: 내 현금에서 수수료를 먼저 뗌
+			fee = cash * (commission / 100)
+			total_fees_paid += fee
+			
+			# 3. 진짜 살 수 있는 주식 수 계산
+			investable_cash = cash - fee
+			shares = investable_cash / buy_price
 			cash = 0
-		elif rsi >= 70 and shares > 0: #매도
-			cash = shares * price
+			
+		# 🔴 매도 로직 (현실 반영)
+		elif rsi >= 70 and shares > 0: 
+			# 1. 슬리피지 적용: 내가 본 가격보다 미세하게 '싸게' 팔림
+			sell_price = price * (1 - (slippage / 100))
+			
+			# 2. 매도 금액 계산 및 수수료 차감
+			gross_proceeds = shares * sell_price
+			fee = gross_proceeds * (commission / 100)
+			total_fees_paid += fee
+			
+			cash = gross_proceeds - fee
 			shares = 0
 
-	# 오늘까지 안 팔고 들고 있다면 현재 주가로 가치 계산
-	final_value = cash if cash > 0 else shares * df['Close'].iloc[-1]
-	profit_pct = ((final_value - capital) / capital) * 100
-
-	b_col1, b_col2 = st.columns(2)
-	b_col1.metric("초기 투자 금액", f"${capital:,.2f}")
-
-	if profit_pct > 0:
-		b_col2.metric("현재 내 통장 잔고 (수익률)", f"${final_value:,.2f}", f"+{profit_pct:.2f}%")
-	else:
-		b_col2.metric("현재 내 통장 잔고 (수익률)", f"${final_value:,.2f}", f"{profit_pct:.2f}%")
-
+	# 🏁 최종 가치 계산 (오늘까지 안 팔고 들고 있다면 현재 주가로 가치 계산, 팔 때의 수수료/슬리피지도 가상으로 빼줌)
 	if shares > 0:
-		st.info("현재 상태: **주식 보유 중** (아직 팔 타이밍(RSI 70)이 오지 않았습니다)")
+		final_sell_price = df['Close'].iloc[-1] * (1 - (slippage / 100))
+		gross_val = shares * final_sell_price
+		final_value = gross_val - (gross_val * (commission / 100))
 	else:
-		st.info("현재 상태: **현금 보유 중** (아직 살 타이밍(RSI 30)이 오지 않았습니다)")
+		final_value = cash
 
-	st.divider()
+	# 💸 세금 계산 로직 (양도소득세)
+	total_profit = final_value - capital
+	tax_amount = 0
+	taxable_threshold_usd = 1850 # 250만 원을 달러로 환산 (약 $1850)
+
+	if total_profit > taxable_threshold_usd:
+		# 250만 원을 초과한 수익금에 대해서만 22% 세금 부과
+		tax_amount = (total_profit - taxable_threshold_usd) * 0.22 
+
+	net_final_value = final_value - tax_amount
+	net_profit_pct = ((net_final_value - capital) / capital) * 100
+
+	# --- 화면 출력 ---
+	b_col1, b_col2, b_col3 = st.columns(3)
+	b_col1.metric("초기 투자 금액", f"${capital:,.2f}")
+	
+	if net_profit_pct > 0:
+		b_col2.metric("세후 최종 통장 잔고", f"${net_final_value:,.2f}", f"+{net_profit_pct:.2f}% (찐수익)")
+	else:
+		b_col2.metric("세후 최종 통장 잔고", f"${net_final_value:,.2f}", f"{net_profit_pct:.2f}% (찐수익)")
+
+	b_col3.metric("💸 뜯긴 돈 (수수료+세금)", f"-${(total_fees_paid + tax_amount):,.2f}")
+
+	if tax_amount > 0:
+		st.error(f"🚨 삐빅! 수익이 250만 원을 초과하여 양도소득세 **${tax_amount:,.2f}**가 부과되었습니다. (국세청이 좋아합니다)")
+	else:
+		st.success("✅ 비과세 구간입니다! (수익이 250만 원 이하이거나 손실 중입니다.)")
 
 	st.subheader("⏳ 과거로 가는 타임머신 (적립식 투자 시뮬레이터)")
 	with st.expander(f"💸 만약 내가 매달 '{short_name}' 주식을 꾸준히 샀다면?"):
