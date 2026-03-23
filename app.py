@@ -12,6 +12,7 @@ import smtplib
 import json
 import firebase_admin
 import google.generativeai as genai
+import plotly.graph_objects as go
 from firebase_admin import credentials, firestore
 from email.mime.text import MIMEText
 
@@ -463,8 +464,31 @@ try:
 
 	st.divider()
 
-	st.subheader(f"{ticker_symbol} 주가 및 이동평균선 흐름")
-	st.line_chart(df[['Close', '20일_이동평균', '60일_이동평균']].tail(252))
+	st.subheader(f"📊 {ticker_symbol} 전문가용 캔들 차트 (최근 1년)")
+
+	df_chart = df.tail(252)
+
+	fig = go.Figure(data=[go.Candlestick(
+		x=df_chart.index,
+		open=df_chart['Open'],
+		high=df_chart['High'],
+		low=df_chart['Low'],
+		close=df_chart['Close'],
+		name='주가 캔들'
+	)])
+
+	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['20일_이동평균'], mode='lines', name='20일 이동평균', line=dict(color='orange', width=1.5)))\
+	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['60일_이동평균'], mode='lines', name='60일 이동평균', line=dict(color='blue', width=1.5)))
+
+	fig.update_layout(
+		xaxis_rangeslider_visible=False,
+		template='plotly_dark',
+		margin=dict(l=20, r=20, t=40, b=20),
+		height=500,
+		yaxis_title='주가 (USD)'
+	)
+
+	st.plotly_chart(fig, use_container_width=True)
 
 	st.subheader("RSI (상대강도지수) 차트 - 30 밑이면 매수, 70 위면 매도")
 	st.line_chart(df['RSI'].tail(252))
