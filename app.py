@@ -574,6 +574,20 @@ try:
 
 				st.divider()
 
+				st.write("📈 **최근 4년 매출액 vs 당기순이익 성적표** (우상향하는 기업이 최고!)")
+				if not financials.empty:
+					fin_df = financials.T.head(4)[::-1]
+					if 'Total Revenue' in fin_df.columns and 'Net Income' in fin_df.columns:
+						chart_data = pd.DataFrame({
+							'매출액 (Revenue)': fin_df['Total Revenue'],
+							'당기순이익 (Net Income)': fin_df['Net Income']
+						})
+						st.bar_chart(chart_data)
+					else:
+						st.info("이 종목은 상세 매출/이익 차트를 제공하지 않습니다.")
+				else:
+					st.info("재무제표 데이터가 없습니다. (ETF나 상장 폐지 종목일 수 있습니다.)")
+
 			except Exception as e:
 				st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
 
