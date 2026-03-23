@@ -517,7 +517,62 @@ try:
 	
 	st.divider()
 
-	# 기술적 지표 계산
+	st.subheader("🏢 기업 기초체력 (펀더멘털) 분석")
+	with st.expander("📊 재무제표 & 핵심 지표 열어보기 (진짜 돈 넣기 전 필수 확인!)"):
+		with st.spinner("야후 파이낸스에서 기업의 재무 장부를 뒤지고 있습니다... ⏳"):
+			try:
+				stock_obj = yf.Ticker(ticker_symbol)
+				financials = stock_obj.financials
+				
+				st.write("💡 **핵심 펀더멘털 지표**")
+				f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+				
+				margin = info.get('profitMargins', 0) * 100 if info.get('profitMargins') else 0
+				roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') else 0
+				debt_to_eq = info.get('debtToEquity', 0) if info.get('debtToEquity') else 0
+				op_cashflow = info.get('operatingCashflow', 0) if info.get('operatingCashflow') else 0
+				
+				if margin >= 20:
+					f_col1.success(f"순이익률\n\n**{margin:.1f}%** (마진 끝판왕 👑)")
+				elif margin > 0:
+					f_col1.metric("순이익률 (마진)", f"{margin:.1f}%")
+				else:
+					f_col1.error(f"순이익률\n\n**{margin:.1f}%** (적자 상태 🚨)")
+					
+				f_col2.metric("자기자본이익률 (ROE)", f"{roe:.1f}%" if roe != 0 else "N/A")
+				f_col3.metric("부채비율 (빚)", f"{debt_to_eq:.1f}%" if debt_to_eq != 0 else "N/A")
+				
+				if op_cashflow != 0:
+					if "KS" in ticker_symbol or "KQ" in ticker_symbol:
+						cf_str = f"{op_cashflow / 100000000:,.0f}억 원"
+					else:
+						cf_str = f"${op_cashflow / 1000000:,.0f}M"
+				else:
+					cf_str = "N/A"
+				f_col4.metric("영업활동 현금흐름", cf_str)
+
+				st.divider()
+
+				st.write("📈 **최근 4년 매출액 vs 당기순이익 성적표** (우상향하는 기업이 최고!)")
+				if not financials.empty:
+					fin_df = financials.T.head(4)[::-1] # 최근 4년치 추출 후 과거->현재 순으로 시간순 배열
+					
+					if 'Total Revenue' in fin_df.columns and 'Net Income' in fin_df.columns:
+						chart_data = pd.DataFrame({
+							'매출액 (Revenue)': fin_df['Total Revenue'],
+							'당기순이익 (Net Income)': fin_df['Net Income']
+						})
+						st.bar_chart(chart_data)
+					else:
+						st.info("이 종목은 상세 매출/이익 차트를 제공하지 않습니다.")
+				else:
+					st.info("재무제표 데이터가 없습니다. (ETF나 상장 폐지 종목일 수 있습니다.)")
+
+			except Exception as e:
+				st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
+	
+	st.divider()
+
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
 
@@ -840,44 +895,34 @@ try:
 
 	st.divider()
 
-	# --- ✨ 궁극기 1: 내 주식 전담 AI 비서 (Chat UI) ---
 	st.subheader("💬 내 주식 전담 AI 비서")
 	st.write(f"**{ticker_symbol}** 종목이나 투자 전략에 대해 무엇이든 물어보세요!")
 
-	# 채팅 기록을 세션에 저장 (화면을 새로고침해도 대화 내용이 유지되도록)
 	if "chat_history" not in st.session_state:
 		st.session_state.chat_history = []
 
-	# 1. 기존 채팅 기록 화면에 뿌려주기
 	for msg in st.session_state.chat_history:
 		with st.chat_message(msg["role"]):
 			st.markdown(msg["content"])
 
-	# 2. 유저가 입력창에 질문을 쳤을 때 실행되는 로직
 	if chat_input := st.chat_input("이 주식의 향후 전망을 분석해 줘!"):
-		# 유저 질문을 화면에 띄우고 기록장부에 저장
 		st.session_state.chat_history.append({"role": "user", "content": chat_input})
 		with st.chat_message("user"):
 			st.markdown(chat_input)
 
-		# AI 비서의 답변 생성!
 		with st.chat_message("assistant"):
 			with st.spinner("AI 비서가 차트와 뉴스를 분석하며 답변을 작성 중입니다... ✍️"):
 				try:
-					# 넉넉한 3세대 모델 출동!
 					chat_model = genai.GenerativeModel('gemini-3-flash-preview')
 					
-					# AI에게 현재 유저가 어떤 종목을 보고 있는지 은슬쩍 알려주는 프롬프트 엔지니어링!
 					system_prompt = f"너는 월스트리트 수석 퀀트 분석가이자 친절한 주식 멘토야. 현재 사용자는 '{ticker_symbol}' 주식 데이터를 보고 있어. 질문에 전문적이고 친절하게 대답해 줘. 질문: {chat_input}"
 					
 					response = chat_model.generate_content(system_prompt)
 					
-					# 답변 출력 및 기록장부에 저장
 					st.markdown(response.text)
 					st.session_state.chat_history.append({"role": "assistant", "content": response.text})
 				except Exception as chat_e:
 					st.error(f"앗, AI 응답에 문제가 생겼습니다! API 한도나 네트워크를 확인해 주세요. (에러: {chat_e})")
 
-# 앱 전체의 try문을 닫아주는 아주 중요한 마지막 줄! (들여쓰기 없음)
 except Exception as e:
 	st.error(f"데이터를 불러오는 데 실패했습니다. (에러: {e})")
