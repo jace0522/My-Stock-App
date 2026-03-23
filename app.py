@@ -398,7 +398,7 @@ try:
 		with st.spinner("포트폴리오 전체 데이터를 수학적으로 분석 중입니다... ⏳"):
 			try:
 				all_tickers = []
-				for theme, tickers in st.session_state[''portfolio'].items():
+				for theme, tickers in st.session_state['portfolio'].items():
 					all_tickers.extend(tickers)
 				all_tickers = list(set(all_tickers))
 
