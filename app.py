@@ -70,7 +70,7 @@ def get_news_and_ai_summary(ticker):
 
 	items = root.findall('.//item')
 	if not items:
-		return None, "현재 이 종목에 대한 최신 뉴스가 없습니다."
+		return None, "현재 이 종목에 대한 최신 뉴스가 없습니다.", 50
 
 	news_titles = []
 	news_md_list = []
@@ -92,11 +92,22 @@ def get_news_and_ai_summary(ticker):
 
 	이 뉴스들을 종합해서 한국어로 분석해 줘.
 	1. 현재 이 주식의 상황을 아주 쉬운 한국어로 3줄로 요약해.
-	2. 종합적으로 이 뉴스들이 '🟢 호재(상승 기대)', '🔴 악재(하락 주의)', '⚪ 중립' 중 어떤 것에 해당하는지 결론을 내려줘.
+	2. 종합적으로 이 뉴스들이 '🟢 호재', '🔴 악재', '⚪ 중립' 중 어떤 것에 해당하는지 결론을 내려줘.
+	3. 중요: 맨 마지막 줄에는 반드시 이 뉴스의 '감성 점수'를 0부터 100 사이의 숫자(정수)로만 딱 하나 적어줘. (0=최악의 악재, 50=중립, 100=최고의 호재. 예: 85)
 	"""
 	ai_response = model.generate_content(prompt)
+	text = ai_response.text
 
-	return news_markdown, ai_response.text
+	score = 50
+	try:
+		numbers = re.findall(r'\d+', text)
+		if numbers:
+			score = int(numbers[-1])
+			score = max(0, min(100, score))
+	except:
+		pass
+
+	return news_markdown, text, score
 
 try:
 	firebase_admin.get_app()
@@ -546,12 +557,30 @@ try:
 	if st.button("🚀 Gemini AI 뉴스 3줄 요약 실행하기"):
 		with st.spinner("AI가 월스트리트 뉴스를 싹 다 읽고 있습니다... ⏳"):
 			try:
-				news_md, ai_summary = get_news_and_ai_summary(ticker_symbol)
+				news_md, ai_summary, sentiment_score = get_news_and_ai_summary(ticker_symbol)
 
 				if news_md:
 						st.markdown(news_md)
 						st.divider()
-						st.write("🧠 **Gemini AI가 뉴스를 분석했습니다.**")
+						
+						st.subheader("🤖 AI가 평가한 오늘의 뉴스 감성 점수")
+						score_col1, score_col2 = st.columns([1, 4])
+
+						with score_col1:
+							st.metric("감성 점수 (0~100)", f"{sentiment_score}점")
+
+						with score_col2:
+							st.write("")
+							st.progress(sentiment_score / 100.0)
+
+							if sentiment_score >= 70:
+								st.success("시장 분위기가 아주 좋습니다! 강력한 호재가 예상됩니다. 🚀")
+							elif sentiment_score <= 30:
+								st.error("시장 분위기가 얼어붙었습니다. 리스크 관리에 주의하세요! 🥶")
+							else:
+								st.warning("시장 분위기가 미지근합니다. 특별한 호재도 악재도 없네요. 😐")
+						st.divider()
+						st.write("🧠 **Gemini AI 상세 분석 리포트**")
 						st.info(ai_summary)
 				else:
 						st.write(ai_summary)
