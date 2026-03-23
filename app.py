@@ -305,7 +305,10 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	if my_holdings:
 		st.write("📦 **보유 주식:**")
 		for ticker, info in my_holdings.items():
-				st.write(f"- **{ticker}**: {info['shares']}주 (평단가: ${info['avg_price']:,.2f})")
+				# ✨ 한국 주식은 ₩(원), 미국 주식은 $(달러)로 표시하는 마법!
+				sym = "₩" if ticker.endswith('.KS') or ticker.endswith('.KQ') else "$"
+				decimals = 0 if sym == "₩" else 2
+				st.write(f"- **{ticker}**: {info['shares']}주 (평단가: {sym}{info['avg_price']:,.{decimals}f})")
 	else:
 		st.info("현재 보유 중인 주식이 없습니다. 맘에 드는 종목을 매수해 보세요!")
 
@@ -428,13 +431,21 @@ try:
 		pbr = fv_pbr if pbr == 0 else pbr
 		target_price = fv_target if target_price == 0 else target_price
 		
+	# --- ✨ 원화/달러 자동 인식 및 환율 적용 로직 ---
+	is_kr = ticker_symbol.endswith('.KS') or ticker_symbol.endswith('.KQ')
+	KRW_RATE = 1350.0 # 1달러 = 1350원 (고정 환율)
+
+	def fmt_price(val):
+		if is_kr: return f"₩{val:,.0f}"
+		return f"${val:,.2f}"
+
 	short_name = info.get('shortName', ticker_symbol)
 	st.subheader(f"🏢 {short_name} 요약 정보")
 
 	col1, col2, col3 = st.columns(3)
-	col1.metric("현재 주가", f"${current_price}")
+	col1.metric("현재 주가", fmt_price(current_price))
 	col2.metric("PER (주가수익비율)", f"{per:.2f}" if per > 0 else "N/A")
-	col3.metric("52주 최고가", f"${high_52:.2f}")
+	col3.metric("52주 최고가", fmt_price(high_52))
 
 	st.write("### 모의투자 매수 / 매도")
 
@@ -442,18 +453,22 @@ try:
 
 	trade_shares = trade_col1.number_input("수량", min_value=1, value=1, step=1)
 	total_trade_amount = trade_shares * current_price
-	trade_col3.info(f"💰 총 예상 금액: **${total_trade_amount:,.2f}**\n\n(내 잔고: ${st.session_state['account']['cash']:,.2f})")
+	
+	# ✨ 계좌는 USD 기준이므로, 한국 주식을 살 때는 원화를 달러로 환산해서 계산!
+	trade_amount_usd = total_trade_amount / KRW_RATE if is_kr else total_trade_amount
+
+	trade_col3.info(f"💰 총 예상 금액: **{fmt_price(total_trade_amount)}**\n(계좌 차감액: **${trade_amount_usd:,.2f}**)\n\n(내 잔고: ${st.session_state['account']['cash']:,.2f})")
 
 	if trade_col1.button("🟢 매수 (Buy)", use_container_width=True):
-		if st.session_state['account']['cash'] >= total_trade_amount:
-			st.session_state['account']['cash'] -= total_trade_amount
+		if st.session_state['account']['cash'] >= trade_amount_usd:
+			st.session_state['account']['cash'] -= trade_amount_usd
 
 			holdings = st.session_state['account']['holdings']
 			if ticker_symbol in holdings:
 				old_shares = holdings[ticker_symbol]['shares']
 				old_avg = holdings[ticker_symbol]['avg_price']
 				new_shares = old_shares + trade_shares
-				new_avg = ((old_shares * old_avg) + total_trade_amount) / new_shares
+				new_avg = ((old_shares * old_avg) + current_price) / new_shares
 				holdings[ticker_symbol]['shares'] = new_shares
 				holdings[ticker_symbol]['avg_price'] = new_avg
 			else:
@@ -463,12 +478,12 @@ try:
 			st.success(f"🎉 {ticker_symbol} {trade_shares}주 매수 완료! (DB 저장됨)")
 			st.rerun()
 		else:
-			st.error("잔고가 부족합니다!😅")
+			st.error("잔고가 부족합니다!😅 (원화/달러 환율을 확인해 보세요)")
 
 	if trade_col2.button("🔴 매도 (Sell)", use_container_width=True):
 		holdings = st.session_state['account']['holdings']
 		if ticker_symbol in holdings and holdings[ticker_symbol]['shares'] >= trade_shares:
-			st.session_state['account']['cash'] += total_trade_amount
+			st.session_state['account']['cash'] += trade_amount_usd
 
 			holdings[ticker_symbol]['shares'] -= trade_shares
 			if holdings[ticker_symbol]['shares'] == 0:
@@ -508,10 +523,10 @@ try:
 	with v_col3:
 		if target_price > current_price and current_price >0:
 			up_potential = ((target_price - current_price) / current_price) * 100
-			st.success(f"🎯 월스트리트 목표가: ${target_price}\n\n**+{up_potential:.1f}% 상승 여력**")
+			st.success(f"🎯 월스트리트 목표가: {fmt_price(target_price)}\n\n**+{up_potential:.1f}% 상승 여력**")
 		elif target_price > 0 and current_price > 0:
 			down_potential = ((current_price - target_price) / current_price) * 100
-			st.error(f"🎯 월스트리트 목표가: ${target_price}\n\n**-{down_potential:.1f}% 하락 위험 (거품)**")
+			st.error(f"🎯 월스트리트 목표가: {fmt_price(target_price)}\n\n**-{down_potential:.1f}% 하락 위험 (거품)**")
 		else:
 			st.info("목표가 정보 없음")
 	
