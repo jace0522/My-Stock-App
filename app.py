@@ -650,6 +650,82 @@ try:
 		st.info("현재 상태: **현금 보유 중** (아직 살 타이밍(RSI 30)이 오지 않았습니다)")
 
 	st.divider()
+
+	st.subheader("⏳ 과거로 가는 타임머신 (적립식 투자 시뮬레이터)")
+	with st.expander(f"💸 만약 내가 매달 '{short_name}' 주식을 꾸준히 샀다면?"):
+		st.write(f"과거로 돌아가서 매월 일정한 금액으로 **{ticker_symbol}** 주식을 모아갔다면 지금 얼마가 되었을지 확인해 보세요!")
+		
+		dca_col1, dca_col2 = st.columns(2)
+		monthly_inv = dca_col1.number_input("매월 투자할 금액 (달러)", min_value=10, value=100, step=10)
+		invest_months = dca_col2.slider("투자 기간 (개월)", min_value=3, max_value=24, value=12) # 최대 2년(24개월)
+		
+		if st.button("🚀 타임머신 출발!", type="primary", use_container_width=True):
+			with st.spinner("과거 데이터를 타고 시간을 거슬러 올라가는 중... 🌀"):
+				try:
+					df_dca = df.copy()
+					
+					df_monthly = df_dca.resample('M').last()
+					
+					df_monthly = df_monthly.tail(invest_months)
+					
+					if len(df_monthly) < invest_months:
+						st.warning(f"💡 이 종목은 상장된 지 얼마 안 되어서 {len(df_monthly)}개월치 데이터만 시뮬레이션합니다.")
+					
+					total_shares = 0
+					total_invested = 0
+					history_invested = []
+					history_value = []
+					dates = []
+					
+					for date, row in df_monthly.iterrows():
+						price = row['Close']
+						if pd.isna(price): continue
+						
+						shares_bought = monthly_inv / price # 쪼개기 매수(소수점 주식) 가정
+						total_shares += shares_bought
+						total_invested += monthly_inv
+						
+						dates.append(date)
+						history_invested.append(total_invested)
+						history_value.append(total_shares * price)
+					
+					final_value = total_shares * current_price
+					profit_money = final_value - total_invested
+					profit_pct = (profit_money / total_invested) * 100 if total_invested > 0 else 0
+					
+					st.success(f"시뮬레이션 완료! 총 {len(dates)}개월 동안 꾸준히 모은 결과입니다.")
+					
+					res_col1, res_col2, res_col3 = st.columns(3)
+					res_col1.metric("내 통장에서 빠져나간 원금", f"${total_invested:,.2f}")
+					res_col2.metric("현재 평가 금액 (수익률)", f"${final_value:,.2f}", f"{profit_pct:.2f}%")
+					res_col3.metric("누적 모은 주식 수", f"{total_shares:.2f}주")
+					
+					fig_dca = go.Figure()
+					
+					fig_dca.add_trace(go.Scatter(x=dates, y=history_invested, mode='lines', name='총 투자 원금', line=dict(color='gray', width=2, dash='dash')))
+					
+					line_color = '#00ff88' if profit_money >= 0 else '#ff4b4b'
+					fig_dca.add_trace(go.Scatter(x=dates, y=history_value, mode='lines+markers', name='실제 평가 금액', line=dict(color=line_color, width=3)))
+					
+					fig_dca.update_layout(
+						title=f"매월 ${monthly_inv}씩 {ticker_symbol}에 투자했을 때의 자산 변화",
+						template="plotly_dark",
+						xaxis_title="투자 기간",
+						yaxis_title="금액 (USD)",
+						hovermode="x unified",
+						height=400,
+						margin=dict(l=20, r=20, t=40, b=20)
+					)
+					st.plotly_chart(fig_dca, use_container_width=True)
+					
+					if profit_pct > 0:
+						st.balloons()
+						st.info("💡 역시 우상향하는 주식에 적립식으로 꾸준히 장기 투자하는 게 정답이네요! 시간과 복리의 마법입니다. 🧙‍♂️")
+					else:
+						st.warning("🥲 하락장에서는 적립식 투자도 손실을 피할 순 없네요. 하지만 비쌀 때나 쌀 때나 꾸준히 사서 '평균 단가'를 낮추는 방어 효과는 확실했습니다!")
+						
+				except Exception as e:
+					st.error(f"시뮬레이션 중 오류가 발생했습니다: {e}")
 	
 	st.subheader("AI 딥러닝(LSTM) 내일 주가 예측")
 	st.write("딥러닝 모델이 과거 10일치 패턴을 학습 중...⏳")
