@@ -799,17 +799,14 @@ try:
             
 	st.divider()
 
-	# --- ✨ 장기 투자 무기 3: 산업(Sector) 맞춤형 심층 분석 ---
 	st.subheader("🏭 산업(Sector) 맞춤형 심층 분석")
-	
-	# ✨ 추가된 주린이용 산업별 지표 가이드!
 	with st.expander("📖 R&D, ROA, 마진율... 이 산업에서는 어떤 숫자가 좋은 건가요?", expanded=False):
 		st.info("""
-		* 🔬 **R&D (연구개발) 투자 비율:** 주로 빅테크나 제약/바이오에서 생명줄입니다. 번 돈의 **10~20% 이상 꾸준히 투자**한다면 미래가 밝은 기업 (🟢 **매수 긍정**). 이 숫자를 줄인다면 당장 이익은 나도 결국 도태될 위험이 큽니다 (🔴 **매도 주의**).
-		* 🏦 **총자산이익률 (ROA):** 주로 은행/금융주를 평가할 때 봅니다. 은행은 남에게 빌려준 돈(대출)이 다 자산이라서 덩치가 엄청 큽니다. 그래서 ROA가 **1~1.5%만 넘어도 돈을 기가 막히게 잘 굴리는 훌륭한 은행**입니다 (🟢 **매수 긍정**).
-		* 🍔 **영업이익률 (Operating Margin):** 소비재, 자동차, 제조업의 핵심! 재료비, 인건비, 월세 다 떼고 순수하게 '장사로 남긴 돈'입니다. **제조업은 10% 이상, 소프트웨어는 20~30% 이상**이면 훌륭합니다. 이 숫자가 전년 대비 뚝뚝 떨어진다면 원가 관리에 실패했다는 뜻입니다 (🔴 **매도 강력 주의**).
-		* 💰 **매출 총이익률 (Gross Margin):** 순수 '원가'만 뺀 비율이에요. **50% 이상으로 아주 높다면**, 애플이나 페라리처럼 대체 불가능한 브랜드 파워를 가져서 가격을 맘대로 올릴 수 있는 '독점적 기업'이라는 뜻입니다 (🟢 **강력 매수**).
-		* 📈 **매출 성장률 (YoY):** 작년 대비 회사의 덩치가 얼마나 커졌는지 보여줍니다. **꾸준히 두 자릿수(+10% 이상) 성장**한다면 주가도 오를 확률이 매우 높고, 마이너스(-)로 돌아섰다면 성장이 끝났다는 강력한 적신호입니다 (🔴 **매도 강력 주의**).
+		* 🔬 **R&D (연구개발) 투자 비율:** 주로 빅테크나 제약/바이오에서 생명줄입니다. 번 돈의 **10~20% 이상 꾸준히 투자**한다면 미래가 밝은 기업 (🟢 **매수 긍정**).
+		* 🏦 **총자산이익률 (ROA):** 주로 은행/금융주를 평가할 때 봅니다. 은행은 ROA가 **1~1.5%만 넘어도 돈을 기가 막히게 잘 굴리는 훌륭한 은행**입니다 (🟢 **매수 긍정**).
+		* 🍔 **영업이익률 (Operating Margin):** 소비재, 제조업의 핵심이자 **삼성전자/애플 같은 하드웨어 테크 기업에게도 제일 중요한 지표**입니다! 재료비, 인건비 다 떼고 남긴 돈으로, **제조업은 10% 이상, 소프트웨어는 20~30% 이상**이면 훌륭합니다. (🔴 떨어지면 **매도 강력 주의**).
+		* 💰 **매출 총이익률 (Gross Margin):** 순수 '원가'만 뺀 비율이에요. **50% 이상으로 아주 높다면**, 독점적 브랜드 파워를 가졌다는 뜻입니다 (🟢 **강력 매수**).
+		* 📈 **매출 성장률 (YoY):** 작년 대비 회사의 덩치가 얼마나 커졌는지 보여줍니다. **꾸준히 두 자릿수(+10% 이상) 성장**해야 좋습니다.
 		""")
 
 	with st.expander(f"'{short_name}'이(가) 속한 산업의 핵심 지표 파헤치기", expanded=False):
@@ -830,26 +827,30 @@ try:
 			else:
 				rnd_ratio = 0
 				
-			s_col1, s_col2, s_col3 = st.columns(3)
-			
+			# ✨ 카멜레온 로직 업그레이드: 기술주는 4칸으로 쪼개서 영업이익률까지 싹 다 보여주기!
 			if sector == 'Technology' or sector == 'Healthcare':
-				st.info("💡 **기술(Tech) 및 헬스케어 산업**은 당장의 마진보다 미래를 위한 **'연구개발(R&D)'** 투자가 생명줄입니다!")
+				st.info("💡 **기술(Tech) 및 헬스케어 산업**은 미래를 위한 **'연구개발(R&D)'**과 당장의 **'영업이익률'**을 동시에 봐야 합니다!")
+				s_col1, s_col2, s_col3, s_col4 = st.columns(4) # 👈 4칸으로 확장!
 				s_col1.metric("R&D 투자 비율", f"{rnd_ratio:.1f}%" if rnd_ratio > 0 else "데이터 없음")
-				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
-				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
+				s_col3.metric("매출 총이익률", f"{gross_margins:.1f}%")
+				s_col4.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
 			elif sector == 'Financial Services':
 				st.info("💡 **금융 산업**은 PER보다 **'자산(ROA) 대비 수익성'**과 **'영업이익률'**이 중요합니다!")
 				roa = fund_info.get('returnOnAssets', 0) * 100 if fund_info.get('returnOnAssets') else 0
+				s_col1, s_col2, s_col3 = st.columns(3)
 				s_col1.metric("총자산이익률 (ROA)", f"{roa:.2f}%")
 				s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-			elif sector == 'Consumer Cyclical' or sector == 'Consumer Defensive':
-				st.info("💡 **소비재 산업**은 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
+			elif sector == 'Consumer Cyclical' or sector == 'Consumer Defensive' or sector == 'Industrials':
+				st.info("💡 **소비재 및 산업재(제조업)**는 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
+				s_col1, s_col2, s_col3 = st.columns(3)
 				s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
 				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
 			else:
 				st.info("💡 이 산업의 기본적인 수익성과 성장성을 확인해 보세요.")
+				s_col1, s_col2, s_col3 = st.columns(3)
 				s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
 				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
