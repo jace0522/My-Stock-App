@@ -753,12 +753,45 @@ try:
 		initial_cap = drip_c1.number_input("초기 투자 금액 ($)", value=10000, step=1000)
 		monthly_cont = drip_c1.number_input("매월 추가 투자금 ($)", value=500, step=100)
 		
-		# 야후 파이낸스에서 배당률 가져오기 시도
-		yield_pct = fund_info.get('dividendYield', 0) * 100 if fund_info.get('dividendYield') else 0.0
-		if pd.isna(yield_pct): yield_pct = 0.0
+		# --- ✨ 똑똑한 AI 자동 계산 로직 시작 ---
+		# 1. 과거 데이터를 바탕으로 연평균 복리 수익률(CAGR) 자동 계산
+		try:
+			start_price = df['Close'].iloc[0]
+			end_price = df['Close'].iloc[-1]
+			# 우리가 가져온 데이터(df)의 기간을 연 단위로 환산 (보통 1년 = 252 거래일)
+			years_passed = len(df) / 252 
+			
+			if years_passed > 0 and end_price > 0 and start_price > 0:
+				auto_cagr = ((end_price / start_price) ** (1 / years_passed) - 1) * 100
+				# 너무 비현실적인 값(폭등/폭락주)은 상한/하한선 제한
+				auto_cagr = max(-30.0, min(auto_cagr, 100.0)) 
+			else:
+				auto_cagr = 8.0
+		except:
+			auto_cagr = 8.0
+
+		# 2. 야후가 배당률을 안 주면? 최근 1년 실제 배당금 내역으로 강제 계산!
+		yield_pct = fund_info.get('dividendYield')
+		if not yield_pct:
+			try:
+				div_history = stock_obj.dividends
+				if not div_history.empty:
+					# 최근 1년(365일) 동안 지급된 배당금 다 더하기
+					last_1y_div = div_history.last("365D").sum()
+					yield_pct = last_1y_div / current_price
+				else:
+					yield_pct = 0.0
+			except:
+				yield_pct = 0.0
 		
-		expected_return = drip_c2.number_input("예상 연평균 주가 상승률 (%)", value=8.0, step=1.0)
-		dividend_yield = drip_c2.number_input("예상 연평균 배당 수익률 (%)", value=float(yield_pct), step=0.5)
+		auto_div_yield = float(yield_pct) * 100 if yield_pct else 0.0
+		# -----------------------------------
+		
+		st.info(f"💡 AI가 분석한 이 종목의 최근 연평균 수익률은 **{auto_cagr:.1f}%**, 배당률은 **{auto_div_yield:.2f}%**입니다. (아래 입력창에 자동 세팅되었습니다!)")
+
+		# 자동 계산된 값을 기본값(value)으로 쏙 넣어주기!
+		expected_return = drip_c2.number_input("예상 연평균 주가 상승률 (%)", value=round(float(auto_cagr), 1), step=1.0)
+		dividend_yield = drip_c2.number_input("예상 연평균 배당 수익률 (%)", value=round(float(auto_div_yield), 2), step=0.1)
 		
 		invest_years = drip_c3.slider("투자를 유지할 기간 (년)", min_value=1, max_value=40, value=20)
 		
