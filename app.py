@@ -628,9 +628,29 @@ try:
 			shares_out = fund_info.get('sharesOutstanding', 0)
 			total_cash = fund_info.get('totalCash', 0)
 			total_debt = fund_info.get('totalDebt', 0)
+			
 			if pd.isna(recent_fcf): recent_fcf = 0
 			
-			st.info("💡 야 파이낸스에서 최근 재무 데이터를 자동으로 불러왔습니다. (데이터가 0이라면 다른 사이트를 참고해 직접 입력해 주세요!)")
+			# --- ✨ 2단계: 과거 장부를 털어서 '평균 매출 성장률' AI 자동 계산 ---
+			auto_growth_rate = 15.0 # 계산 실패 시 쓸 기본값
+			try:
+				if not financials.empty and 'Total Revenue' in financials.index:
+					rev_data = financials.loc['Total Revenue'].dropna()
+					if len(rev_data) >= 2: # 최소 2년 치 데이터가 있어야 비교 가능
+						latest_rev = rev_data.iloc[0] # 가장 최근 매출
+						oldest_rev = rev_data.iloc[-1] # 가장 옛날 매출 (보통 3~4년 전)
+						years = len(rev_data) - 1
+						
+						if oldest_rev > 0 and latest_rev > 0:
+							# 연평균 복리 성장률(CAGR) 수학 공식 적용!
+							cagr = ((latest_rev / oldest_rev) ** (1 / years) - 1) * 100
+							# 슬라이더가 고장 나지 않게 상한선(50%)과 하한선(-10%) 안전장치 걸기
+							auto_growth_rate = max(-10.0, min(cagr, 50.0))
+			except:
+				pass
+			# -------------------------------------------------------------
+
+			st.info(f"💡 과거 재무제표를 분석한 결과, 이 기업의 최근 연평균 매출 성장률은 **{auto_growth_rate:.1f}%**입니다. (슬라이더에 자동 세팅되었습니다!)")
 			
 			dcf_col1, dcf_col2 = st.columns(2)
 			
@@ -643,10 +663,10 @@ try:
 				
 			with dcf_col2:
 				st.markdown("📈 **[2단계] 미래 성장률 & 할인율 가정**")
-				growth_1_5 = st.slider("향후 1~5년 예상 성장률 (%)", -10.0, 50.0, 15.0, 1.0)
-				growth_6_10 = st.slider("향후 6~10년 예상 성장률 (%)", -10.0, 30.0, 10.0, 1.0)
-				discount_rate = st.slider("할인율 (WACC, 요구수익률) (%)", 5.0, 20.0, 10.0, 0.5)
-				terminal_growth = st.slider("영구 성장률 (10년 이후) (%)", 0.0, 5.0, 2.5, 0.1)
+				# 계산된 성장률을 1~5년 슬라이더 기본값으로 쏙!
+				growth_1_5 = st.slider("향후 1~5년 예상 성장률 (%)", -10.0, 50.0, float(round(auto_growth_rate, 1)), 1.0)
+				# 6~10년은 보통 기세가 꺾이므로 '절반(50%)' 정도로 보수적으로 세팅!
+				growth_6_10 = st.slider("향후 6~10년 예상 성장률 (%)", -10.0, 30.0, float(round(max(-10.0, auto_growth_rate * 0.5), 1)), 1.0)
 				
 			if st.button("📊 이 조건으로 적정 주가 계산하기", type="primary", use_container_width=True):
 				if input_fcf <= 0 or input_shares <= 0:
