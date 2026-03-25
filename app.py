@@ -1233,7 +1233,7 @@ try:
 			try:
 				report_model = genai.GenerativeModel('gemini-3-flash-preview')
 				report_prompt = f"""
-				너는 월스트리트 최고의 퀀트 애널리스트야. 다음 데이터를 바탕으로 '{short_name} ({ticker_symbol})'에 대한 투자 리포트를 작성해.
+				너는 월스트리트 최고의 퀀트 애널리스트이자 깐깐한 가치 투자자야. 다음 데이터를 바탕으로 '{short_name} ({ticker_symbol})'에 대한 투자 리포트를 작성해.
 
 				[현재 데이터 팩트]
 				- 주가: {current_price} (52주 최고가: {high_52})
@@ -1243,9 +1243,10 @@ try:
 				[요구사항]
 				반드시 HTML 태그를 사용해서 예쁘게 꾸며줘. (<h1>, <h2>, <ul>, <b> 등 사용. 마크다운 기호 사용 금지)
 				1. 🎯 한 줄 요약 (이 주식을 지금 사야 하는가?)
-				2. 📊 기술적 분석 요약 (매수/매도 타이밍 관점)
-				3. 🏢 펀더멘털 분석 요약 (저평가/고평가 여부)
-				4. ⚖️ 최종 투자 의견 (Strong Buy / Buy / Hold / Sell) 및 핵심 근거 3가지
+				2. 📊 기술적/가치 분석 요약 (단기 매수 타이밍 및 고평가/저평가 여부)
+				3. ⏳ 장기 투자 가치 평가 (가장 중요! 이 기업을 10년 이상 장기 보유할 가치가 있는지 명확히 평가해.)
+				4. 🧠 장기 투자 판단 기준 (위 3번에서 장기 투자가 적합/부적합하다고 판단한 구체적인 '핵심 기준' 3가지를 재무, 비즈니스 모델, 해자(Moat) 관점에서 논리적으로 설명해 줘.)
+				5. ⚖️ 최종 투자 의견 (Strong Buy / Buy / Hold / Sell) 및 액션 플랜
 				"""
 				report_response = report_model.generate_content(report_prompt)
 
