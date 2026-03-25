@@ -1282,6 +1282,83 @@ try:
 
 	st.divider()
 
+	# --- ✨ 궁극기 4: 몬테카를로 시뮬레이션 (미래 평행우주 예측) ---
+	st.subheader("🎲 닥터 스트레인지의 평행우주 (몬테카를로 시뮬레이션)")
+	with st.expander(f"1년 뒤 '{short_name}' 주식에 일어날 수 있는 수많은 미래 엿보기", expanded=False):
+		st.write("과거의 주가 변동성(위험)과 평균 수익률을 바탕으로 수학적 난수(주사위)를 발생시켜, 미래 주가의 확률적 분포를 시뮬레이션합니다.")
+
+		try:
+			# 1. 과거 데이터로 평균 수익률(mu)과 일일 변동성(sigma) 계산
+			daily_returns = df['Close'].pct_change().dropna()
+			mu = daily_returns.mean()
+			sigma = daily_returns.std()
+
+			mc_c1, mc_c2, mc_c3 = st.columns(3)
+			
+			sim_days = mc_c1.slider("시뮬레이션 기간 (거래일)", 30, 252, 252) # 252일 = 대략 1년
+			sim_paths = mc_c2.slider("생성할 평행우주(시나리오) 개수", 10, 500, 100)
+			
+			# AI가 계산한 값을 기본값으로 세팅 (사용자가 수정 가능)
+			user_mu = mc_c3.number_input("일평균 기대 수익률 (%)", value=float(mu * 100), step=0.01) / 100
+			user_sigma = mc_c3.number_input("일일 변동성 (리스크) (%)", value=float(sigma * 100), step=0.1) / 100
+
+			if st.button("🎲 수백 개의 미래 엿보기 (시뮬레이션 실행)", type="primary", use_container_width=True):
+				with st.spinner("수백 개의 평행우주를 겹쳐서 그리는 중... 🌀"):
+					last_price = df['Close'].iloc[-1]
+					
+					# 2. 몬테카를로 시뮬레이션 매트릭스 생성 (기하학적 브라운 운동 - GBM 모델)
+					simulation_df = pd.DataFrame()
+					
+					for x in range(sim_paths):
+						# 매일매일의 무작위 충격(Z) 생성
+						shock = np.random.normal(loc=user_mu - (0.5 * user_sigma**2), scale=user_sigma, size=sim_days)
+						price_path = last_price * np.exp(np.cumsum(shock))
+						simulation_df[x] = price_path
+						
+					# 3. 시각화 (Plotly)
+					fig_mc = go.Figure()
+					
+					# 모든 평행우주 선 그리기 (투명도를 낮춰서 거미줄처럼 표현)
+					for x in range(sim_paths):
+						fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=simulation_df[x], mode='lines', line=dict(color='rgba(0, 176, 246, 0.05)'), showlegend=False, hoverinfo='skip'))
+						
+					# 굵은 선으로 통계적 요약(중앙값, 상/하위 5%) 표시
+					median_path = simulation_df.median(axis=1)
+					top_5_path = simulation_df.quantile(0.95, axis=1)
+					bottom_5_path = simulation_df.quantile(0.05, axis=1)
+					
+					fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=median_path, mode='lines', name='가장 흔한 미래 (중앙값)', line=dict(color='yellow', width=3)))
+					fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=top_5_path, mode='lines', name='상위 5% 초대박 우주', line=dict(color='lime', width=2, dash='dash')))
+					fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=bottom_5_path, mode='lines', name='하위 5% 최악의 우주', line=dict(color='red', width=2, dash='dash')))
+					
+					fig_mc.update_layout(
+						title=f"'{ticker_symbol}'의 향후 {sim_days}일 주가 시나리오 ({sim_paths}번 시뮬레이션)",
+						xaxis_title="경과 일수 (Days)",
+						yaxis_title="예상 주가 (USD)",
+						template="plotly_dark",
+						height=500,
+						hovermode="x unified"
+					)
+					st.plotly_chart(fig_mc, use_container_width=True)
+					
+					# 4. 결과 요약
+					final_median = median_path.iloc[-1]
+					final_top = top_5_path.iloc[-1]
+					final_bottom = bottom_5_path.iloc[-1]
+					
+					st.success("시뮬레이션 완료! 난수가 만들어낸 미래의 확률 분포입니다.")
+					m_col1, m_col2, m_col3 = st.columns(3)
+					m_col1.metric("가장 현실적인 미래 (중앙값)", fmt_price(final_median), f"{((final_median/last_price)-1)*100:.1f}%")
+					m_col2.metric("상위 5% 대박 시나리오", fmt_price(final_top), f"{((final_top/last_price)-1)*100:.1f}%")
+					m_col3.metric("하위 5% 폭망 시나리오 (최악)", fmt_price(final_bottom), f"{((final_bottom/last_price)-1)*100:.1f}%")
+					
+					st.info("💡 **결과 해석:** 이 시뮬레이션은 '내일 무조건 이 가격이 된다'가 아니라, **'과거의 널뛰기(변동성) 패턴을 볼 때 내 돈이 반토막 날 최악의 확률(하위 5%)이 어느 정도인지 리스크를 미리 점검'**하는 데 쓰는 방어형 무기입니다!")
+					
+		except Exception as e:
+			st.error(f"시뮬레이션 중 오류가 발생했습니다: {e}")
+
+	st.divider()
+
 	st.subheader("💬 내 주식 전담 AI 비서")
 	st.write(f"**{ticker_symbol}** 종목이나 투자 전략에 대해 무엇이든 물어보세요!")
 
