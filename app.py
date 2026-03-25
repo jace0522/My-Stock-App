@@ -668,6 +668,10 @@ try:
 				# 6~10년은 보통 기세가 꺾이므로 '절반(50%)' 정도로 보수적으로 세팅!
 				growth_6_10 = st.slider("향후 6~10년 예상 성장률 (%)", -10.0, 30.0, float(round(max(-10.0, auto_growth_rate * 0.5), 1)), 1.0)
 				
+				# 👇 날아갔던 할인율 & 영구 성장률 슬라이더 부활!
+				discount_rate = st.slider("할인율 (WACC, 요구수익률) (%)", 5.0, 20.0, 10.0, 0.5)
+				terminal_growth = st.slider("영구 성장률 (10년 이후) (%)", 0.0, 5.0, 2.5, 0.1)
+
 			if st.button("📊 이 조건으로 적정 주가 계산하기", type="primary", use_container_width=True):
 				if input_fcf <= 0 or input_shares <= 0:
 					st.warning("FCF(잉여현금흐름)와 발행 주식수는 0보다 커야 정상적인 계산이 가능합니다.")
