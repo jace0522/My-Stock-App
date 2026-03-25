@@ -314,16 +314,61 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	my_cash = st.session_state['account']['cash']
 	my_holdings = st.session_state['account']['holdings']
 
-	st.write(f"💵 **보유 현금:** ${my_cash:,.2f}")
+	# 1. 계산을 위한 초기 뼈대
+	total_stock_value_usd = 0.0
+	STARTING_BALANCE = 10000.0 # 맨 처음 시작한 기본 자본금 ($10,000)
+	current_krw_rate = get_exchange_rate() # 한국 주식 달러 환산용 실시간 환율
 
 	if my_holdings:
-		st.write("📦 **보유 주식:**")
+		st.write("📦 **보유 주식 상세 내역:**")
+		
 		for ticker, info in my_holdings.items():
-				sym = "₩" if ticker.endswith('.KS') or ticker.endswith('.KQ') else "$"
-				decimals = 0 if sym == "₩" else 2
-				st.write(f"- **{ticker}**: {info['shares']}주 (평단가: {sym}{info['avg_price']:,.{decimals}f})")
+			is_kr = ticker.endswith('.KS') or ticker.endswith('.KQ')
+			sym = "₩" if is_kr else "$"
+			decimals = 0 if is_kr else 2
+			
+			# 현재가 실시간으로 긁어오기 (캐시 활용해서 빠르게!)
+			try:
+				df_temp, info_temp = load_data(ticker)
+				current_p = info_temp.get('currentPrice') or info_temp.get('regularMarketPrice')
+				if not current_p: current_p = df_temp['Close'].iloc[-1]
+			except:
+				current_p = info['avg_price'] # 혹시 에러 나면 평단가로 임시 처리
+			
+			shares = info['shares']
+			avg_price = info['avg_price']
+			
+			# 수익금 & 수익률 계산
+			profit_pct = ((current_p - avg_price) / avg_price) * 100
+			profit_amount = (current_p - avg_price) * shares
+			current_total_value = current_p * shares
+			
+			# 총자산(USD) 합산을 위한 달러 환산
+			if is_kr:
+				total_stock_value_usd += (current_total_value / current_krw_rate)
+			else:
+				total_stock_value_usd += current_total_value
+				
+			# 화면에 예쁘게 띄우기 (빨간색/초록색 화살표 적용)
+			arrow = "🔴" if profit_pct < 0 else "🟢"
+			plus = "+" if profit_pct > 0 else ""
+			
+			st.markdown(f"- **{ticker}** | {shares}주 | 평단가: {sym}{avg_price:,.{decimals}f} ➔ **현재가: {sym}{current_p:,.{decimals}f}** |  {arrow} **{plus}{profit_pct:.2f}%** (수익금: {sym}{profit_amount:,.{decimals}f})")
+			
 	else:
 		st.info("현재 보유 중인 주식이 없습니다. 맘에 드는 종목을 매수해 보세요!")
+
+	# 2. 내 총 계좌 요약 (현금 + 현재 주식 가치)
+	st.divider()
+	total_account_value = my_cash + total_stock_value_usd
+	total_profit_pct = ((total_account_value / STARTING_BALANCE) - 1) * 100
+	
+	st.write("💰 **총 계좌 요약:**")
+	acc_c1, acc_c2 = st.columns(2)
+	acc_c1.metric("보유 현금 (달러)", f"${my_cash:,.2f}")
+	
+	# 수익이 났으면 초록색(+), 잃었으면 빨간색(-)으로 자동 표시
+	acc_c2.metric("총 계좌 자산 (현금 + 주식)", f"${total_account_value:,.2f}", f"{total_profit_pct:+.2f}% (원금 $10,000 대비)")
 
 st.divider()
 
