@@ -18,7 +18,7 @@ from email.mime.text import MIMEText
 
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
+from tensorflow.keras.layers import LSTM, Dense, Dropout
 
 # --- ✨ 리팩토링 1: 앱 설정 및 AI API 글로벌 세팅 ---
 st.set_page_config(layout="wide")
@@ -860,6 +860,11 @@ try:
 	# --- 공통 지표 연산 (앱 전체에서 사용) ---
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
+	
+	# ✨ 딥러닝을 위한 볼린저 밴드 지표 추가
+	df['BB_상단'] = df['20일_이동평균'] + 2 * df['Close'].rolling(window=20).std()
+	df['BB_하단'] = df['20일_이동평균'] - 2 * df['Close'].rolling(window=20).std()
+	
 	delta = df['Close'].diff()
 	up = delta.clip(lower=0)
 	down = -1 * delta.clip(upper=0)
@@ -988,15 +993,17 @@ try:
 	else:
 		st.success("✅ 비과세 구간입니다! (수익이 250만 원 이하이거나 손실 중입니다.)")
 
-	# --- ✨ 리팩토링 2: 딥러닝 버튼화 ---
+	# --- ✨ 리팩토링 2: 딥러닝 모델 고도화 ---
 	st.subheader("🤖 AI 딥러닝(LSTM) 내일 주가 예측")
-	st.write("과거 10일 치의 주가, 이동평균, RSI, MACD 패턴을 분석해 내일의 주가 방향을 예측합니다.")
+	st.write("과거 10일 치의 **거래량, 변동성(볼린저 밴드), 주가 패턴**을 종합 분석해 내일의 방향성을 예측합니다.")
 
-	if st.button("🧠 딥러닝 모델 학습 및 예측 실행", use_container_width=True):
-		with st.spinner("AI가 최근 주가 패턴을 맹렬히 학습하고 있습니다... (약 5~10초 소요) ⏳"):
+	if st.button("🧠 딥러닝 모델 고도화 학습 및 예측 실행", use_container_width=True):
+		with st.spinner("AI가 노이즈를 제거하고 핵심 패턴을 맹렬히 학습 중입니다... (약 10~15초 소요) ⏳"):
 			try:
 				df_clean = df.dropna()
-				features = ['Close', '20일_이동평균', '60일_이동평균', '수익률', 'RSI', 'MACD']
+				
+				# ✨ 1. 데이터(Feature) 확장: 거래량과 볼린저 밴드 추가
+				features = ['Close', 'Volume', '수익률', 'RSI', 'MACD', 'BB_상단', 'BB_하단']
 				scaler = MinMaxScaler()
 				scaled_data = scaler.fit_transform(df_clean[features])
 
@@ -1008,23 +1015,60 @@ try:
 
 				X_lstm, y_lstm = np.array(X_lstm), np.array(y_lstm)
 
+				# ✨ 2. 모델 고도화: 층을 깊게 쌓고 과적합(Overfitting) 방지
 				model = Sequential()
-				model.add(LSTM(50, return_sequences=False, input_shape=(X_lstm.shape[1], X_lstm.shape[2])))
+				model.add(LSTM(50, return_sequences=True, input_shape=(X_lstm.shape[1], X_lstm.shape[2])))
+				model.add(Dropout(0.2)) # 외우기 방지 레이어
+				model.add(LSTM(50, return_sequences=False))
+				model.add(Dropout(0.2)) # 외우기 방지 레이어
 				model.add(Dense(1, activation='sigmoid'))
+				
 				model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-				model.fit(X_lstm, y_lstm, epochs=5, batch_size=16, verbose=0)
+				# 에포크를 약간 늘려서 더 꼼꼼히 학습
+				model.fit(X_lstm, y_lstm, epochs=10, batch_size=16, verbose=0)
 
 				last_10_days = scaled_data[-time_step:]
 				last_10_days = np.expand_dims(last_10_days, axis=0)
 				prediction_prob = model.predict(last_10_days, verbose=0)[0][0]
 
-				if prediction_prob > 0.5:
-					st.success(f"📈 **딥러닝 예측:** 내일은 **상승**할 확률이 높습니다! (상승 확률: {prediction_prob*100:.1f}%)")
+				# ✨ 3. 전문가용 게이지 차트(Gauge Chart) 시각화
+				fig_gauge = go.Figure(go.Indicator(
+					mode = "gauge+number",
+					value = prediction_prob * 100,
+					number = {'suffix': "%", 'font': {'size': 40, 'color': 'white'}},
+					domain = {'x': [0, 1], 'y': [0, 1]},
+					title = {'text': "내일 주가 상승 확률", 'font': {'size': 20, 'color': 'lightgray'}},
+					gauge = {
+						'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+						'bar': {'color': "white", 'thickness': 0.2},
+						'bgcolor': "rgba(0,0,0,0)",
+						'steps': [
+							{'range': [0, 45], 'color': "rgba(255, 75, 75, 0.6)"}, # 하락 유력 (빨강)
+							{'range': [45, 55], 'color': "rgba(128, 128, 128, 0.3)"}, # 중립 (회색)
+							{'range': [55, 100], 'color': "rgba(0, 255, 136, 0.6)"} # 상승 유력 (초록)
+						],
+						'threshold': {
+							'line': {'color': "white", 'width': 3},
+							'thickness': 0.75,
+							'value': prediction_prob * 100
+						}
+					}
+				))
+				fig_gauge.update_layout(height=350, margin=dict(l=20, r=20, t=50, b=20), template="plotly_dark")
+				st.plotly_chart(fig_gauge, use_container_width=True)
+
+				# 평가 코멘트
+				if prediction_prob >= 0.55:
+					st.success("🟢 **강력한 상승 시그널:** AI가 긍정적인 패턴을 포착했습니다.")
+				elif prediction_prob <= 0.45:
+					st.error("🔴 **강력한 하락 시그널:** AI가 부정적인 패턴(저항선 도달, 거래량 감소 등)을 포착했습니다. 주의하세요.")
 				else:
-					st.error(f"📉 **딥러닝 예측:** 내일은 **하락**할 확률이 높습니다. (하락 확률: {(1-prediction_prob)*100:.1f}%)")
+					st.warning("🟡 **방향성 탐색 중:** 뚜렷한 상승/하락 패턴이 보이지 않습니다. (동전 던지기와 비슷한 확률입니다.)")
+					
+				st.info("💡 **알림:** 본 딥러닝 모델은 과거 패턴의 통계적 요약일 뿐, 내일 아침에 터질 뉴스나 파월 의장의 발언 같은 '외부 변수'는 모릅니다. 절대 맹신하지 마세요!")
+
 			except Exception as e:
-				st.warning("데이터가 부족하여 딥러닝 모델을 학습할 수 없습니다.")
+				st.warning(f"데이터가 부족하여 딥러닝 모델을 학습할 수 없습니다. (에러: {e})")
 
 	st.divider()
 
