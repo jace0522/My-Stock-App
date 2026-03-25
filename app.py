@@ -1167,22 +1167,35 @@ try:
 			daily_returns = df['Close'].pct_change().dropna()
 			mu = daily_returns.mean()
 			sigma = daily_returns.std()
+			
+			# ✨ 사용자가 이해하기 쉽게 '연평균(Annual)' 수치로 변환! (1년 = 252 거래일)
+			annual_mu = mu * 252
+			annual_sigma = sigma * np.sqrt(252)
+
+			st.info(f"💡 과거 2년치 데이터를 분석하여 이 종목의 **연평균 수익률({annual_mu*100:.1f}%)**과 **연간 변동성({annual_sigma*100:.1f}%)**을 자동으로 세팅했습니다. 원하는 수치로 조작해 보세요!")
 
 			mc_c1, mc_c2, mc_c3 = st.columns(3)
 			sim_days = mc_c1.slider("시뮬레이션 기간 (거래일)", 30, 252, 252) 
 			sim_paths = mc_c2.slider("생성할 평행우주(시나리오) 개수", 10, 500, 100)
-			user_mu = mc_c3.number_input("일평균 기대 수익률 (%)", value=float(mu * 100), step=0.01) / 100
-			user_sigma = mc_c3.number_input("일일 변동성 (리스크) (%)", value=float(sigma * 100), step=0.1) / 100
+			
+			# ✨ 입력창을 연평균 기준으로 변경
+			user_annual_mu = mc_c3.number_input("연평균 기대 수익률 (%)", value=float(annual_mu * 100), step=1.0)
+			user_annual_sigma = mc_c3.number_input("연간 변동성 (리스크) (%)", value=float(annual_sigma * 100), step=1.0)
 
 			if st.button("🎲 수백 개의 미래 엿보기 (시뮬레이션 실행)", type="primary", use_container_width=True):
 				with st.spinner("수백 개의 평행우주를 겹쳐서 그리는 중... 🌀"):
 					last_price = df['Close'].iloc[-1]
+					
+					# ✨ 시뮬레이션을 돌리기 위해 사용자가 입력한 연평균 값을 다시 일일 수치로 쪼개기
+					daily_mu_user = (user_annual_mu / 100) / 252
+					daily_sigma_user = (user_annual_sigma / 100) / np.sqrt(252)
+					
 					simulation_df = pd.DataFrame()
 					for x in range(sim_paths):
-						shock = np.random.normal(loc=user_mu - (0.5 * user_sigma**2), scale=user_sigma, size=sim_days)
+						shock = np.random.normal(loc=daily_mu_user - (0.5 * daily_sigma_user**2), scale=daily_sigma_user, size=sim_days)
 						price_path = last_price * np.exp(np.cumsum(shock))
 						simulation_df[x] = price_path
-						
+					
 					fig_mc = go.Figure()
 					for x in range(sim_paths):
 						fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=simulation_df[x], mode='lines', line=dict(color='rgba(0, 176, 246, 0.05)'), showlegend=False, hoverinfo='skip'))
