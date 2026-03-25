@@ -859,6 +859,62 @@ try:
 				
 				st.info("💡 **그래프 해석:** 회색은 내 피 같은 원금, 파란색은 주가가 올라서 번 돈, **초록색이 바로 배당금을 다시 투자해서 만든 '공짜 복리 수익'입니다.** 기간이 길어질수록 초록색 영역이 하늘로 솟구치는 걸 확인하세요!")
 
+	st.divider()
+
+	# --- ✨ 장기 투자 무기 3: 산업(Sector) 맞춤형 심층 분석 ---
+	st.subheader("🏭 산업(Sector) 맞춤형 심층 분석")
+	with st.expander(f"'{short_name}'이(가) 속한 산업의 핵심 지표 파헤치기", expanded=False):
+		sector = fund_info.get('sector', '알 수 없음')
+		industry = fund_info.get('industry', '알 수 없음')
+		
+		st.write(f"🏷️ **섹터:** {sector} | **세부 산업:** {industry}")
+		
+		# 야후 파이낸스 장부에서 추가 데이터 긁어오기
+		try:
+			gross_margins = fund_info.get('grossMargins', 0) * 100 if fund_info.get('grossMargins') else 0
+			operating_margins = fund_info.get('operatingMargins', 0) * 100 if fund_info.get('operatingMargins') else 0
+			revenue_growth = fund_info.get('revenueGrowth', 0) * 100 if fund_info.get('revenueGrowth') else 0
+			
+			# R&D(연구개발) 비용 빼오기
+			rnd_expense = 0
+			if not financials.empty and 'Research And Development' in financials.index:
+				rnd_expense = financials.loc['Research And Development'].iloc[0]
+				total_rev = financials.loc['Total Revenue'].iloc[0]
+				rnd_ratio = (rnd_expense / total_rev) * 100 if total_rev > 0 else 0
+			else:
+				rnd_ratio = 0
+				
+			s_col1, s_col2, s_col3 = st.columns(3)
+			
+			# 💡 카멜레온 로직: 섹터별로 보여주는 지표를 다르게 세팅!
+			if sector == 'Technology' or sector == 'Healthcare':
+				st.info("💡 **기술(Tech) 및 헬스케어/제약 산업**은 당장의 마진보다 미래를 위한 **'연구개발(R&D)'** 투자가 생명줄입니다!")
+				s_col1.metric("R&D (연구개발) 투자 비율", f"{rnd_ratio:.1f}%" if rnd_ratio > 0 else "데이터 없음")
+				s_col2.metric("매출 총이익률 (Gross Margin)", f"{gross_margins:.1f}%")
+				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				
+			elif sector == 'Financial Services':
+				st.info("💡 **금융 산업(은행, 투자)**은 PER보다 **'자산(ROA) 대비 수익성'**과 **'영업이익률'**이 훨씬 중요합니다!")
+				roa = fund_info.get('returnOnAssets', 0) * 100 if fund_info.get('returnOnAssets') else 0
+				s_col1.metric("총자산이익률 (ROA)", f"{roa:.2f}%")
+				s_col2.metric("영업이익률 (Operating Margin)", f"{operating_margins:.1f}%")
+				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				
+			elif sector == 'Consumer Cyclical' or sector == 'Consumer Defensive':
+				st.info("💡 **소비재 산업(자동차, 식품 등)**은 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
+				s_col1.metric("영업이익률 (Operating Margin)", f"{operating_margins:.1f}%")
+				s_col2.metric("매출 총이익률 (Gross Margin)", f"{gross_margins:.1f}%")
+				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				
+			else:
+				st.info("💡 이 산업의 기본적인 수익성과 성장성을 확인해 보세요.")
+				s_col1.metric("영업이익률 (Operating Margin)", f"{operating_margins:.1f}%")
+				s_col2.metric("매출 총이익률 (Gross Margin)", f"{gross_margins:.1f}%")
+				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				
+		except Exception as e:
+			st.warning(f"산업 세부 지표를 불러오는 데 실패했습니다: {e}")
+
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
 
