@@ -20,21 +20,19 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 
-# 설정은 맨 위에
+# --- ✨ 리팩토링 1: 앱 설정 및 AI API 글로벌 세팅 ---
 st.set_page_config(layout="wide")
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 @st.cache_data(ttl=3600)
 def load_data(ticker):
-
 	data = yf.Ticker(ticker)
 	df_history = data.history(period="2y")
-
 	info_data = {}
 	try:
 		info_data = data.info
 	except:
 		pass
-	
 	return df_history, info_data
 
 @st.cache_data(ttl=3600)
@@ -65,14 +63,12 @@ def get_finviz_data(ticker):
 @st.cache_data(ttl=3600)
 def get_naver_finance_data(ticker):
 	try:
-		# 티커에서 종목코드만 분리 (예: 005930.KS -> 005930)
 		code = ticker.split('.')[0]
 		url = f"https://finance.naver.com/item/main.naver?code={code}"
 		headers = {'User-Agent': 'Mozilla/5.0'}
 		res = requests.get(url, headers=headers, timeout=5)
 		html = res.text
 
-		# 네이버 증권 페이지에서 정규식(Regex)으로 PER, PBR 숫자만 쏙 빼오기
 		pe_match = re.search(r'<em id="_per">([^<]+)</em>', html)
 		pb_match = re.search(r'<em id="_pbr">([^<]+)</em>', html)
 
@@ -87,13 +83,12 @@ def get_naver_finance_data(ticker):
 def get_exchange_rate():
 	with st.spinner("🌍 실시간 원/달러 환율을 가져오는 중..."):
 		try:
-			# 야후 파이낸스에서 원/달러(USDKRW) 실시간 데이터 가져오기
 			rate_data = yf.Ticker("KRW=X")
 			current_rate = float(rate_data.history(period="1d")['Close'].iloc[-1])
 			return current_rate
 		except:
-			st.warning("환율을 불러오지 못해 임시 환율(1450원)을 적용합니다.")
-			return 1450.0
+			st.warning("환율을 불러오지 못해 임시 환율(1350원)을 적용합니다.")
+			return 1350.0
 
 @st.cache_data(ttl=3600)
 def get_news_and_ai_summary(ticker):
@@ -117,9 +112,8 @@ def get_news_and_ai_summary(ticker):
 
 	news_markdown = "\n".join(news_md_list)
 
-	genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+	# API 세팅은 상단으로 옮겼으므로 모델만 바로 호출
 	model = genai.GenerativeModel('gemini-3-flash-preview')
-
 	prompt = f"""
 	너는 월스트리트의 수석 주식 분석가야. 다음은 오늘 '{ticker}' 주식에 대한 최신 영문 뉴스 헤드라인 5개야.
 	뉴스: {news_titles}
@@ -143,6 +137,7 @@ def get_news_and_ai_summary(ticker):
 
 	return news_markdown, text, score
 
+# --- Firebase 초기화 ---
 try:
 	firebase_admin.get_app()
 except ValueError:
@@ -152,7 +147,6 @@ except ValueError:
 
 db = firestore.client()
 doc_ref = db.collection('user_data').document('my_portfolio')
-
 account_ref = db.collection('user_data').document('my_account')
 
 if 'account' not in st.session_state:
@@ -187,12 +181,12 @@ if 'portfolio' not in st.session_state:
 		st.session_state['portfolio'] = default_portfolio
 		doc_ref.set(default_portfolio)
 
+# --- 사이드바 ---
 st.sidebar.title("📁 내 포트폴리오 (DB 연동됨 ☁️)")
 
 with st.sidebar.expander("➕ 새 종목/테마 검색해서 추가하기"):
 	new_theme = st.text_input("테마 이름", "💻 빅테크 & AI")
 	search_add_keyword = st.text_input("🔍 기업명 검색 (예: SK하이닉스, TSLA)")
-
 	custom_name = st.text_input("🏷️ 리스트에 표시할 이름 (선택사항)", placeholder="예: 갓플, 킹비디아")
 
 	target_ticker_to_add = None
@@ -210,7 +204,6 @@ with st.sidebar.expander("➕ 새 종목/테마 검색해서 추가하기"):
 				if options:
 					selected_add_option = st.selectbox("👇 추가할 종목 선택", options)
 					target_ticker_to_add = selected_add_option.split(' ')[0]
-
 					default_name = selected_add_option.split(' - ')[1] if ' - ' in selected_add_option else target_ticker_to_add
 					custom_name_to_save = custom_name if custom_name else default_name
 				else:
@@ -224,7 +217,6 @@ with st.sidebar.expander("➕ 새 종목/테마 검색해서 추가하기"):
 		if target_ticker_to_add:
 			if new_theme not in st.session_state['portfolio']:
 				st.session_state['portfolio'][new_theme] = {}
-
 			if target_ticker_to_add not in st.session_state['portfolio'][new_theme]:
 				st.session_state['portfolio'][new_theme][target_ticker_to_add] = custom_name_to_save
 				doc_ref.set(st.session_state['portfolio'])
@@ -237,7 +229,6 @@ with st.sidebar.expander("➕ 새 종목/테마 검색해서 추가하기"):
 
 with st.sidebar.expander("🗑️ 잘못 추가된 종목 삭제하기"):
 	del_theme = st.selectbox("삭제할 테마 선택", list(st.session_state['portfolio'].keys()), key="del_theme")
-	
 	if st.session_state['portfolio'][del_theme]:
 		del_ticker = st.selectbox(
 			"삭제할 종목 선택", 
@@ -245,13 +236,10 @@ with st.sidebar.expander("🗑️ 잘못 추가된 종목 삭제하기"):
 			format_func=lambda x: f"{st.session_state['portfolio'][del_theme][x]} ({x})",
 			key="del_ticker"
 		)
-		
 		if st.button("❌ 이 종목 지우기"):
 			del st.session_state['portfolio'][del_theme][del_ticker]
-			
 			if len(st.session_state['portfolio'][del_theme]) == 0:
 				del st.session_state['portfolio'][del_theme]
-				
 			doc_ref.set(st.session_state['portfolio'])
 			st.success("삭제 완료!")
 			st.rerun()
@@ -263,17 +251,15 @@ st.sidebar.write("👇 분석할 테마와 종목을 선택하세요")
 
 theme_list = list(st.session_state['portfolio'].keys())
 target_theme = "💻 빅테크 & AI"
-
 default_idx = theme_list.index(target_theme) if target_theme in theme_list else 0
 
 selected_theme = st.sidebar.selectbox("📂 관심 테마", theme_list, index=default_idx)
-
 theme_dict = st.session_state['portfolio'][selected_theme]
 
 selected_ticker = st.sidebar.radio(
 	f"{selected_theme} 종목", 
 	options=list(theme_dict.keys()), 
-	format_func=lambda x: f"📌 {theme_dict[x]} ({x})", # 화면에는 '📌 갓플 (AAPL)' 처럼 예쁘게 출력!
+	format_func=lambda x: f"📌 {theme_dict[x]} ({x})",
 	label_visibility="collapsed"
 )
 
@@ -283,12 +269,10 @@ st.sidebar.subheader("🔔 매수 타이밍 알림 봇")
 if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 	with st.spinner("전체 종목의 RSI를 분석 중입니다..."):
 		buy_list = []
-
 		for theme, tickers in st.session_state['portfolio'].items():
 			for t in tickers:
 				try:
 					df_temp, _ = load_data(t)
-			
 					delta = df_temp['Close'].diff()
 					up = delta.clip(lower=0)
 					down = -1 * delta.clip(upper=0)
@@ -296,9 +280,7 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 					ema_down = down.ewm(com=13, adjust=False).mean()
 					rs = ema_up / ema_down
 					df_temp['RSI'] = 100 - (100 / (1 + rs))
-
 					latest_rsi = df_temp['RSI'].iloc[-1]
-
 					if latest_rsi <= 30:
 						buy_list.append(f"✅ {t} (현재 RSI: {latest_rsi:.1f}) - {theme}")
 				except:
@@ -319,14 +301,13 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 				with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
 					server.login(sender, password)
 					server.send_message(msg)
-
 				st.sidebar.success("매수 추천 종목을 이메일로 성공적으로 발송했습니다!")
 			except Exception as e:
 				st.sidebar.error("❌ 이메일 전송 실패! 스트림릿 Secrets 설정을 확인해 주세요.")
 		else:
 			st.sidebar.info("지금은 RSI 30 이하인 바겐세일 종목이 없습니다.")
 
-
+# --- 메인 화면 ---
 st.title("주식 AI 분석 앱")
 
 with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
@@ -338,7 +319,6 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	if my_holdings:
 		st.write("📦 **보유 주식:**")
 		for ticker, info in my_holdings.items():
-				# ✨ 한국 주식은 ₩(원), 미국 주식은 $(달러)로 표시하는 마법!
 				sym = "₩" if ticker.endswith('.KS') or ticker.endswith('.KQ') else "$"
 				decimals = 0 if sym == "₩" else 2
 				st.write(f"- **{ticker}**: {info['shares']}주 (평단가: {sym}{info['avg_price']:,.{decimals}f})")
@@ -358,7 +338,6 @@ with st.expander("🤖 포트폴리오 전체 종목 스캔하기 (클릭!)"):
 	if st.button("🔍 위 조건으로 전체 스캔 실행", type="primary"):
 		with st.spinner("월스트리트 데이터를 긁어와 전체 종목을 수학적으로 분석 중입니다... ⏳"):
 			results = []
-			
 			for theme, tickers_dict in st.session_state['portfolio'].items():
 				for t_ticker, t_name in tickers_dict.items():
 					try:
@@ -401,7 +380,7 @@ with st.expander("🤖 포트폴리오 전체 종목 스캔하기 (클릭!)"):
 								"MACD": "상승세 🟢" if latest_macd > latest_signal else "하락세 🔴"
 							})
 					except:
-						pass # 에러나는 종목은 조용히 패스
+						pass
 
 			if results:
 				st.success(f"🎉 삐빅! 조건에 딱 맞는 종목 {len(results)}개를 찾았습니다!")
@@ -411,7 +390,6 @@ with st.expander("🤖 포트폴리오 전체 종목 스캔하기 (클릭!)"):
 st.divider()
 
 search_keyword = st.text_input("🔍 기업명(예: 애플, 삼성전자, Tesla) 또는 티커를 입력하세요:", selected_ticker)
-
 ticker_symbol = search_keyword.upper()
 
 if search_keyword and search_keyword != selected_ticker:
@@ -425,7 +403,6 @@ if search_keyword and search_keyword != selected_ticker:
 			if quotes:
 				options = [f"{q['symbol']} - {q.get('shortname', q.get('longname', '이름 없음'))} ({q.get('exchange', 'N/A')})"
 					for q in quotes if q.get('quoteType') in ['EQUITY', 'ETF']]
-
 				if options:
 					selected_option = st.selectbox("👇 아래 검색 결과에서 정확한 종목을 선택하세요!", options)
 					ticker_symbol = selected_option.split(' ')[0]
@@ -454,32 +431,24 @@ try:
 	if not high_52:
 		high_52 = round(df['High'].tail(252).max(), 2)
 	
-	# --- ✨ 국적별 PER/PBR 수집 로직 ---
 	per = info.get('trailingPE') or 0
 	pbr = info.get('priceToBook') or 0
 	target_price = info.get('targetMeanPrice') or 0
 	
-	# 주식이 한국(KS, KQ)인지 미국인지 판별
 	is_kr = ticker_symbol.endswith('.KS') or ticker_symbol.endswith('.KQ')
 
 	if is_kr:
-		# 🇰🇷 한국 주식은 네이버 증권(Plan C) 출동!
 		if per == 0 or pbr == 0:
 			nv_pe, nv_pb = get_naver_finance_data(ticker_symbol)
 			per = nv_pe if per == 0 else per
 			pbr = nv_pb if pbr == 0 else pbr
 	else:
-		# 🇺🇸 미국 주식은 기존처럼 핀비즈(Plan B) 출동!
 		if per == 0 or pbr == 0 or target_price == 0:
 			fv_pe, fv_pbr, fv_target = get_finviz_data(ticker_symbol)
 			per = fv_pe if per == 0 else per
 			pbr = fv_pbr if pbr == 0 else pbr
 			target_price = fv_target if target_price == 0 else target_price
 		
-	# --- ✨ 원화/달러 자동 인식 및 실시간 환율 적용 로직 ---
-	is_kr = ticker_symbol.endswith('.KS') or ticker_symbol.endswith('.KQ')
-	
-	# 이제 하드코딩된 숫자가 아니라 실시간 환율을 가져옵니다!
 	KRW_RATE = get_exchange_rate()
 
 	def fmt_price(val):
@@ -497,11 +466,8 @@ try:
 	st.write("### 모의투자 매수 / 매도")
 
 	trade_col1, trade_col2, trade_col3 = st.columns([1, 1, 2])
-
 	trade_shares = trade_col1.number_input("수량", min_value=1, value=1, step=1)
 	total_trade_amount = trade_shares * current_price
-	
-	# ✨ 계좌는 USD 기준이므로, 한국 주식을 살 때는 원화를 달러로 환산해서 계산!
 	trade_amount_usd = total_trade_amount / KRW_RATE if is_kr else total_trade_amount
 
 	trade_col3.info(f"💰 총 예상 금액: **{fmt_price(total_trade_amount)}**\n(계좌 차감액: **${trade_amount_usd:,.2f}**)\n\n(내 잔고: ${st.session_state['account']['cash']:,.2f})")
@@ -509,7 +475,6 @@ try:
 	if trade_col1.button("🟢 매수 (Buy)", use_container_width=True):
 		if st.session_state['account']['cash'] >= trade_amount_usd:
 			st.session_state['account']['cash'] -= trade_amount_usd
-
 			holdings = st.session_state['account']['holdings']
 			if ticker_symbol in holdings:
 				old_shares = holdings[ticker_symbol]['shares']
@@ -520,7 +485,6 @@ try:
 				holdings[ticker_symbol]['avg_price'] = new_avg
 			else:
 				holdings[ticker_symbol] = {'shares': trade_shares, 'avg_price': current_price}
-
 			account_ref.set(st.session_state['account'])
 			st.success(f"🎉 {ticker_symbol} {trade_shares}주 매수 완료! (DB 저장됨)")
 			st.rerun()
@@ -531,11 +495,9 @@ try:
 		holdings = st.session_state['account']['holdings']
 		if ticker_symbol in holdings and holdings[ticker_symbol]['shares'] >= trade_shares:
 			st.session_state['account']['cash'] += trade_amount_usd
-
 			holdings[ticker_symbol]['shares'] -= trade_shares
 			if holdings[ticker_symbol]['shares'] == 0:
 				del holdings[ticker_symbol]
-
 			account_ref.set(st.session_state['account'])
 			st.success(f"💸 {ticker_symbol} {trade_shares}주 매도 완료! (DB 저장됨)")
 			st.rerun()
@@ -568,7 +530,7 @@ try:
 			st.warning(f"⚖️ PBR: {pbr:.2f}\n\n**적정 수준**")
 
 	with v_col3:
-		if target_price > current_price and current_price >0:
+		if target_price > current_price and current_price > 0:
 			up_potential = ((target_price - current_price) / current_price) * 100
 			st.success(f"🎯 월스트리트 목표가: {fmt_price(target_price)}\n\n**+{up_potential:.1f}% 상승 여력**")
 		elif target_price > 0 and current_price > 0:
@@ -585,12 +547,10 @@ try:
 			try:
 				stock_obj = yf.Ticker(ticker_symbol)
 				financials = stock_obj.financials
-				balance_sheet = stock_obj.balance_sheet # 빚 계산용 장부 추가
-				cashflow = stock_obj.cashflow # 현금흐름용 장부 추가
-				
+				balance_sheet = stock_obj.balance_sheet
+				cashflow = stock_obj.cashflow
 				fund_info = stock_obj.info
 				
-				# ✨ 1. 야후가 요약본을 안 주면? 원본 장부에서 우리가 직접 계산해버리기!
 				margin = fund_info.get('profitMargins', 0) * 100 if fund_info.get('profitMargins') else 0
 				if margin == 0 and not financials.empty:
 					try: margin = (financials.loc['Net Income'].iloc[0] / financials.loc['Total Revenue'].iloc[0]) * 100
@@ -611,7 +571,6 @@ try:
 					try: op_cashflow = cashflow.loc['Operating Cash Flow'].iloc[0]
 					except: pass
 
-				# 2. 계산된 핵심 재무 지표 화면에 띄우기
 				st.write("💡 **핵심 펀더멘털 지표**")
 				f_col1, f_col2, f_col3, f_col4 = st.columns(4)
 				
@@ -655,13 +614,10 @@ try:
 
 	st.divider()
 
-	# --- ✨ 장기 투자 무기 1: DCF (현금흐름할인법) 계산기 ---
 	st.subheader("🔮 기업의 '진짜 가치' 찾기 (DCF 모델)")
 	with st.expander("워렌 버핏처럼 기업의 적정 주가를 직접 계산해 보세요!", expanded=True):
 		st.write("회사가 미래에 벌어들일 잉여현금흐름(FCF)을 추정하여 현재 가치로 할인하는 절대 가치 평가 모델입니다.")
-		
 		try:
-			# 야후 파이낸스 장부에서 DCF 계산에 필요한 재료들 훔쳐오기!
 			recent_fcf = 0
 			if not cashflow.empty and 'Free Cash Flow' in cashflow.index:
 				recent_fcf = cashflow.loc['Free Cash Flow'].iloc[0]
@@ -669,10 +625,9 @@ try:
 			shares_out = fund_info.get('sharesOutstanding', 0)
 			total_cash = fund_info.get('totalCash', 0)
 			total_debt = fund_info.get('totalDebt', 0)
-			
 			if pd.isna(recent_fcf): recent_fcf = 0
 			
-			st.info("💡 야후 파이낸스에서 최근 재무 데이터를 자동으로 불러왔습니다. (데이터가 0이라면 다른 사이트를 참고해 직접 입력해 주세요!)")
+			st.info("💡 야 파이낸스에서 최근 재무 데이터를 자동으로 불러왔습니다. (데이터가 0이라면 다른 사이트를 참고해 직접 입력해 주세요!)")
 			
 			dcf_col1, dcf_col2 = st.columns(2)
 			
@@ -692,39 +647,27 @@ try:
 				
 			if st.button("📊 이 조건으로 적정 주가 계산하기", type="primary", use_container_width=True):
 				if input_fcf <= 0 or input_shares <= 0:
-					st.warning("FCF(잉여현금흐름)와 발행 주식수는 0보다 커야 정상적인 계산이 가능합니다. (회사가 적자 상태면 DCF를 쓰기 어렵습니다!)")
+					st.warning("FCF(잉여현금흐름)와 발행 주식수는 0보다 커야 정상적인 계산이 가능합니다.")
 				elif discount_rate <= terminal_growth:
 					st.warning("수학적 오류! 할인율은 영구 성장률보다 커야 합니다.")
 				else:
 					with st.spinner("미래의 현금흐름을 현재 가치로 끌어오는 중... ⏳"):
-						# 1. 향후 10년 현금흐름 예측 및 현재 가치로 할인
 						future_fcfs = []
 						current_proj_fcf = input_fcf
-						
 						for year in range(1, 11):
 							if year <= 5: current_proj_fcf *= (1 + (growth_1_5 / 100))
 							else: current_proj_fcf *= (1 + (growth_6_10 / 100))
-								
 							discounted_fcf = current_proj_fcf / ((1 + (discount_rate / 100)) ** year)
 							future_fcfs.append(discounted_fcf)
 							
 						sum_discounted_fcf = sum(future_fcfs)
-						
-						# 2. 영구 가치(Terminal Value) 계산 및 할인
 						terminal_value = (current_proj_fcf * (1 + (terminal_growth / 100))) / ((discount_rate / 100) - (terminal_growth / 100))
 						discounted_tv = terminal_value / ((1 + (discount_rate / 100)) ** 10)
-						
-						# 3. 기업 가치(Enterprise Value) 및 주주 가치(Equity Value) 산출
 						enterprise_value = sum_discounted_fcf + discounted_tv
 						equity_value = enterprise_value + input_cash - input_debt
-						
-						# 4. 1주당 적정 주가 산출
 						intrinsic_value = equity_value / input_shares
-						
-						# 안전 마진(Margin of Safety) 계산
 						margin_of_safety = ((intrinsic_value - current_price) / current_price) * 100 if current_price > 0 else 0
 							
-						# 결과 출력
 						st.success("계산 완료! 시장이 평가하는 가격과 데이터가 말하는 진짜 가치를 비교해 보세요.")
 						res_c1, res_c2, res_c3 = st.columns(3)
 						res_c1.metric("현재 시장 주가", fmt_price(current_price))
@@ -733,50 +676,42 @@ try:
 							res_c2.metric("내가 계산한 적정 주가", fmt_price(intrinsic_value))
 							if margin_of_safety > 0:
 								res_c3.metric("안전 마진 (저평가율)", f"+{margin_of_safety:.1f}%", "저평가 (매수 찬스!)")
-								st.info(f"💡 현재 주가보다 적정 가치가 **{margin_of_safety:.1f}%** 더 높습니다! 워렌 버핏이 좋아하는 '안전 마진'이 확보된 바겐세일 상태일 수 있습니다.")
+								st.info(f"💡 현재 주가보다 적정 가치가 **{margin_of_safety:.1f}%** 더 높습니다! 바겐세일 상태일 수 있습니다.")
 							else:
 								res_c3.metric("안전 마진 (고평가율)", f"{margin_of_safety:.1f}%", "고평가 (거품 주의)")
-								st.warning(f"⚠️ 현재 주가가 적정 가치보다 비쌉니다. 회사의 미래 성장에 대한 시장의 기대감이 너무 높거나 거품이 끼어있을 수 있으니 주의하세요!")
+								st.warning(f"⚠️ 현재 주가가 적정 가치보다 비쌉니다. 거품이 끼어있을 수 있으니 주의하세요!")
 						else:
-							st.error("계산된 적정 주가가 마이너스입니다. 회사의 빚이 너무 많거나 현금흐름이 꼬여있습니다.")
+							st.error("계산된 적정 주가가 마이너스입니다.")
 		except Exception as e:
 			st.error(f"DCF 데이터를 준비하는 중 오류가 발생했습니다: {e}")
             
 	st.divider()
 
-	# --- ✨ 장기 투자 무기 2: 배당 재투자(DRIP) 복리 시뮬레이터 ---
 	st.subheader("❄️ 시간과 복리의 마법 (배당 재투자 시뮬레이터)")
 	with st.expander("워렌 버핏의 스노우볼! 배당금을 안 쓰고 계속 재투자한다면?", expanded=False):
-		st.write("주가 상승분뿐만 아니라, 매년 나오는 배당금을 다시 해당 주식을 사는 데 썼을 때(DRIP) 자산이 어떻게 기하급수적으로 증식하는지 눈으로 확인해 보세요.")
+		st.write("주가 상승분뿐만 아니라, 매년 나오는 배당금을 다시 해당 주식을 사는 데 썼을 때(DRIP) 자산이 어떻게 기하급수적으로 증식하는지 확인해 보세요.")
 
 		drip_c1, drip_c2, drip_c3 = st.columns(3)
 		initial_cap = drip_c1.number_input("초기 투자 금액 ($)", value=10000, step=1000)
 		monthly_cont = drip_c1.number_input("매월 추가 투자금 ($)", value=500, step=100)
 		
-		# --- ✨ 똑똑한 AI 자동 계산 로직 시작 ---
-		# 1. 과거 데이터를 바탕으로 연평균 복리 수익률(CAGR) 자동 계산
 		try:
 			start_price = df['Close'].iloc[0]
 			end_price = df['Close'].iloc[-1]
-			# 우리가 가져온 데이터(df)의 기간을 연 단위로 환산 (보통 1년 = 252 거래일)
 			years_passed = len(df) / 252 
-			
 			if years_passed > 0 and end_price > 0 and start_price > 0:
 				auto_cagr = ((end_price / start_price) ** (1 / years_passed) - 1) * 100
-				# 너무 비현실적인 값(폭등/폭락주)은 상한/하한선 제한
 				auto_cagr = max(-30.0, min(auto_cagr, 100.0)) 
 			else:
 				auto_cagr = 8.0
 		except:
 			auto_cagr = 8.0
 
-		# 2. 야후가 배당률을 안 주면? 최근 1년 실제 배당금 내역으로 강제 계산!
 		yield_pct = fund_info.get('dividendYield')
 		if not yield_pct:
 			try:
 				div_history = stock_obj.dividends
 				if not div_history.empty:
-					# 최근 1년(365일) 동안 지급된 배당금 다 더하기
 					last_1y_div = div_history.last("365D").sum()
 					yield_pct = last_1y_div / current_price
 				else:
@@ -785,14 +720,11 @@ try:
 				yield_pct = 0.0
 		
 		auto_div_yield = float(yield_pct) * 100 if yield_pct else 0.0
-		# -----------------------------------
 		
 		st.info(f"💡 AI가 분석한 이 종목의 최근 연평균 수익률은 **{auto_cagr:.1f}%**, 배당률은 **{auto_div_yield:.2f}%**입니다. (아래 입력창에 자동 세팅되었습니다!)")
 
-		# 자동 계산된 값을 기본값(value)으로 쏙 넣어주기!
 		expected_return = drip_c2.number_input("예상 연평균 주가 상승률 (%)", value=round(float(auto_cagr), 1), step=1.0)
 		dividend_yield = drip_c2.number_input("예상 연평균 배당 수익률 (%)", value=round(float(auto_div_yield), 2), step=0.1)
-		
 		invest_years = drip_c3.slider("투자를 유지할 기간 (년)", min_value=1, max_value=40, value=20)
 		
 		if st.button("❄️ 스노우볼 굴리기 (시뮬레이션 시작)", type="primary", use_container_width=True):
@@ -800,23 +732,17 @@ try:
 				months = invest_years * 12
 				monthly_return = expected_return / 100 / 12
 				monthly_dividend = dividend_yield / 100 / 12
-				
 				data_records = []
-				
 				total_principal = initial_cap
 				current_balance_no_drip = initial_cap
 				current_balance_drip = initial_cap
 				
 				for m in range(1, months + 1):
 					total_principal += monthly_cont
-					
-					# 배당 재투자 안 함 (주가 수익만 + 원금)
 					current_balance_no_drip = current_balance_no_drip * (1 + monthly_return) + monthly_cont
-					
-					# 배당 재투자 함 (주가 수익 + 배당 수익 + 원금)
 					current_balance_drip = current_balance_drip * (1 + monthly_return + monthly_dividend) + monthly_cont
 					
-					if m % 12 == 0: # 매년 말 데이터 기록
+					if m % 12 == 0:
 						data_records.append({
 							"Year": m // 12,
 							"원금 (Principal)": total_principal,
@@ -825,57 +751,35 @@ try:
 						})
 				
 				df_drip = pd.DataFrame(data_records)
-				
-				# 결과 지표 출력
 				st.success(f"시간이 무기입니다! {invest_years}년 후의 놀라운 결과입니다.")
 				r_col1, r_col2, r_col3 = st.columns(3)
 				r_col1.metric("내가 넣은 순수 원금", f"${total_principal:,.0f}")
 				r_col2.metric("배당금 뺀 최종 자산 (주가만 상승)", f"${current_balance_no_drip:,.0f}")
-				
 				drip_bonus = current_balance_drip - current_balance_no_drip
-				r_col3.metric("배당 재투자 시 최종 자산", f"${current_balance_drip:,.0f}", f"+${drip_bonus:,.0f} (배당 스노우볼 효과!)")
+				r_col3.metric("배당 재투자 시 최종 자산", f"${current_balance_drip:,.0f}", f"+${drip_bonus:,.0f} (스노우볼 효과!)")
 				
-				# Plotly 누적 영역 차트 (Stacked Area Chart)
 				fig_snow = go.Figure()
-				
-				# 1. 내 원금 (안전한 바닥)
 				fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['원금 (Principal)'], fill='tozeroy', mode='none', name='내 순수 원금', fillcolor='rgba(128, 128, 128, 0.2)'))
-				
-				# 2. 단순 주가 상승분
 				fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['주가 수익만 (No DRIP)'], fill='tonexty', mode='none', name='단순 주가 상승분', fillcolor='rgba(0, 176, 246, 0.4)'))
-				
-				# 3. 배당 재투자 스노우볼 (폭발적 성장)
 				fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['배당 재투자 (DRIP)'], fill='tonexty', mode='none', name='배당 재투자 (복리의 마법)', fillcolor='rgba(0, 255, 136, 0.6)'))
-				
-				fig_snow.update_layout(
-					title=f"매월 ${monthly_cont}씩 투자할 때, 배당 재투자가 만드는 층층이 쌓인 부의 격차",
-					xaxis_title="투자 기간 (년)",
-					yaxis_title="자산 규모 (USD)",
-					template="plotly_dark",
-					hovermode="x unified",
-					height=500
-				)
+				fig_snow.update_layout(title=f"매월 ${monthly_cont}씩 투자할 때의 자산 변화", xaxis_title="투자 기간 (년)", yaxis_title="자산 규모 (USD)", template="plotly_dark", hovermode="x unified", height=500)
 				st.plotly_chart(fig_snow, use_container_width=True)
 				
-				st.info("💡 **그래프 해석:** 회색은 내 피 같은 원금, 파란색은 주가가 올라서 번 돈, **초록색이 바로 배당금을 다시 투자해서 만든 '공짜 복리 수익'입니다.** 기간이 길어질수록 초록색 영역이 하늘로 솟구치는 걸 확인하세요!")
+				st.info("💡 **초록색이 바로 배당금을 다시 투자해서 만든 '공짜 복리 수익'입니다.** 기간이 길어질수록 초록색 영역이 하늘로 솟구치는 걸 확인하세요!")
 
 	st.divider()
 
-	# --- ✨ 장기 투자 무기 3: 산업(Sector) 맞춤형 심층 분석 ---
 	st.subheader("🏭 산업(Sector) 맞춤형 심층 분석")
 	with st.expander(f"'{short_name}'이(가) 속한 산업의 핵심 지표 파헤치기", expanded=False):
 		sector = fund_info.get('sector', '알 수 없음')
 		industry = fund_info.get('industry', '알 수 없음')
-		
 		st.write(f"🏷️ **섹터:** {sector} | **세부 산업:** {industry}")
 		
-		# 야후 파이낸스 장부에서 추가 데이터 긁어오기
 		try:
 			gross_margins = fund_info.get('grossMargins', 0) * 100 if fund_info.get('grossMargins') else 0
 			operating_margins = fund_info.get('operatingMargins', 0) * 100 if fund_info.get('operatingMargins') else 0
 			revenue_growth = fund_info.get('revenueGrowth', 0) * 100 if fund_info.get('revenueGrowth') else 0
 			
-			# R&D(연구개발) 비용 빼오기
 			rnd_expense = 0
 			if not financials.empty and 'Research And Development' in financials.index:
 				rnd_expense = financials.loc['Research And Development'].iloc[0]
@@ -886,38 +790,33 @@ try:
 				
 			s_col1, s_col2, s_col3 = st.columns(3)
 			
-			# 💡 카멜레온 로직: 섹터별로 보여주는 지표를 다르게 세팅!
 			if sector == 'Technology' or sector == 'Healthcare':
-				st.info("💡 **기술(Tech) 및 헬스케어/제약 산업**은 당장의 마진보다 미래를 위한 **'연구개발(R&D)'** 투자가 생명줄입니다!")
-				s_col1.metric("R&D (연구개발) 투자 비율", f"{rnd_ratio:.1f}%" if rnd_ratio > 0 else "데이터 없음")
-				s_col2.metric("매출 총이익률 (Gross Margin)", f"{gross_margins:.1f}%")
+				st.info("💡 **기술(Tech) 및 헬스케어 산업**은 당장의 마진보다 미래를 위한 **'연구개발(R&D)'** 투자가 생명줄입니다!")
+				s_col1.metric("R&D 투자 비율", f"{rnd_ratio:.1f}%" if rnd_ratio > 0 else "데이터 없음")
+				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-				
 			elif sector == 'Financial Services':
-				st.info("💡 **금융 산업(은행, 투자)**은 PER보다 **'자산(ROA) 대비 수익성'**과 **'영업이익률'**이 훨씬 중요합니다!")
+				st.info("💡 **금융 산업**은 PER보다 **'자산(ROA) 대비 수익성'**과 **'영업이익률'**이 중요합니다!")
 				roa = fund_info.get('returnOnAssets', 0) * 100 if fund_info.get('returnOnAssets') else 0
 				s_col1.metric("총자산이익률 (ROA)", f"{roa:.2f}%")
-				s_col2.metric("영업이익률 (Operating Margin)", f"{operating_margins:.1f}%")
+				s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-				
 			elif sector == 'Consumer Cyclical' or sector == 'Consumer Defensive':
-				st.info("💡 **소비재 산업(자동차, 식품 등)**은 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
-				s_col1.metric("영업이익률 (Operating Margin)", f"{operating_margins:.1f}%")
-				s_col2.metric("매출 총이익률 (Gross Margin)", f"{gross_margins:.1f}%")
+				st.info("💡 **소비재 산업**은 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
+				s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
+				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-				
 			else:
 				st.info("💡 이 산업의 기본적인 수익성과 성장성을 확인해 보세요.")
-				s_col1.metric("영업이익률 (Operating Margin)", f"{operating_margins:.1f}%")
-				s_col2.metric("매출 총이익률 (Gross Margin)", f"{gross_margins:.1f}%")
+				s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
+				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
 				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-				
 		except Exception as e:
 			st.warning(f"산업 세부 지표를 불러오는 데 실패했습니다: {e}")
 
+	# --- 공통 지표 연산 (앱 전체에서 사용) ---
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
-
 	delta = df['Close'].diff()
 	up = delta.clip(lower=0)
 	down = -1 * delta.clip(upper=0)
@@ -925,12 +824,10 @@ try:
 	ema_down = down.ewm(com=13, adjust=False).mean()
 	rs = ema_up / ema_down
 	df['RSI'] = 100 - (100 / (1 + rs))
-
 	exp1 = df['Close'].ewm(span=12, adjust=False).mean()
 	exp2 = df['Close'].ewm(span=26, adjust=False).mean()
 	df['MACD'] = exp1 - exp2
 	df['Signal_Line'] = df['MACD'].ewm(span=9, adjust=False).mean()
-
 	df['수익률'] = df['Close'].pct_change()
 	df['Target'] = np.where(df['Close'].shift(-1) > df['Close'], 1, 0)
 
@@ -940,32 +837,21 @@ try:
 	latest_signal = df['Signal_Line'].iloc[-1]
 
 	c1, c2, c3 = st.columns(3)
-
 	with c1:
-		if latest_rsi <= 30:
-			st.success(f"📊 RSI: {latest_rsi:.1f}\n\n🔥 **강한 매수 찬스 (과매도)**")
-		elif latest_rsi >= 70:
-			st.error(f"📊 RSI: {latest_rsi:.1f}\n\n⚠️ **매도 주의 (과매수)**")
-		else:
-			st.info(f"📊 RSI: {latest_rsi:.1f}\n\n➖ **보통 (관망)**")
-
+		if latest_rsi <= 30: st.success(f"📊 RSI: {latest_rsi:.1f}\n\n🔥 **강한 매수 찬스 (과매도)**")
+		elif latest_rsi >= 70: st.error(f"📊 RSI: {latest_rsi:.1f}\n\n⚠️ **매도 주의 (과매수)**")
+		else: st.info(f"📊 RSI: {latest_rsi:.1f}\n\n➖ **보통 (관망)**")
 	with c2:
-		if latest_macd > latest_signal:
-			st.success(f"📈 MACD 흐름\n\n**상승 추세 진입 (매수 시그널)**")
-		else:
-			st.error(f"📉 MACD 흐름\n\n**하락 추세 (조심!)**")
-
+		if latest_macd > latest_signal: st.success(f"📈 MACD 흐름\n\n**상승 추세 (매수 시그널)**")
+		else: st.error(f"📉 MACD 흐름\n\n**하락 추세 (조심!)**")
 	with c3:
-		if df['20일_이동평균'].iloc[-1] > df['60일_이동평균'].iloc[-1]:
-			st.success("🌟 이동평균선\n\n**정배열 (안정적 상승세)**")
-		else:
-			st.error("🌧️ 이동평균선\n\n**역배열 (하락세)**")
+		if df['20일_이동평균'].iloc[-1] > df['60일_이동평균'].iloc[-1]: st.success("🌟 이동평균선\n\n**정배열 (상승세)**")
+		else: st.error("🌧️ 이동평균선\n\n**역배열 (하락세)**")
 
 	st.divider()
 
 	st.subheader("🕸️ 포트폴리오 종목 상관관계 (분산투자 리스크 점검)")
 	st.write("내 포트폴리오의 주식들이 서로 얼마나 비슷하게 움직이는지 확인해 보세요.")
-
 	if st.button("📊 상관관계 히트맵 그리기"):
 		with st.spinner("포트폴리오 전체 데이터를 수학적으로 분석 중입니다... ⏳"):
 			try:
@@ -973,37 +859,21 @@ try:
 				for theme, tickers in st.session_state['portfolio'].items():
 					all_tickers.extend(tickers)
 				all_tickers = list(set(all_tickers))
-
 				if len(all_tickers) > 1:
 					close_prices = pd.DataFrame()
 					for t in all_tickers:
 						df_temp, _ = load_data(t)
-						if not df_temp.empty:
-							close_prices[t] = df_temp['Close']
-
+						if not df_temp.empty: close_prices[t] = df_temp['Close']
 					returns = close_prices.pct_change().dropna()
 					corr_matrix = returns.corr()
-
 					fig_corr = go.Figure(data=go.Heatmap(
-						z=corr_matrix.values,
-						x=corr_matrix.columns,
-						y=corr_matrix.index,
-						colorscale='RdBu_r',
-						zmin=-1, zmax=1,
-						text=np.round(corr_matrix.values, 2),
-						texttemplate="%{text}",
-						hoverinfo="text"
+						z=corr_matrix.values, x=corr_matrix.columns, y=corr_matrix.index,
+						colorscale='RdBu_r', zmin=-1, zmax=1,
+						text=np.round(corr_matrix.values, 2), texttemplate="%{text}", hoverinfo="text"
 					))
-
-					fig_corr.update_layout(
-						template="plotly_dark",
-						height=500,
-						margin=dict(l=20, r=20, t=20, b=20)
-					)
-					
+					fig_corr.update_layout(template="plotly_dark", height=500, margin=dict(l=20, r=20, t=20, b=20))
 					st.plotly_chart(fig_corr, use_container_width=True)
-
-					st.info("💡 **데이터 해석 꿀팁:**\n* **빨간색(1.0)에 가까울수록:** 두 주식이 완전히 똑같이 움직인다는 뜻! (위험 분산 안 됨)\n* **파란색(-1.0)에 가까울수록:** 두 주식이 반대로 움직인다는 뜻! (시장 폭락 시 방어력 좋음)\n* **흰색(0)에 가까울수록:** 서로 전혀 상관없이 움직인다는 뜻입니다.")
+					st.info("💡 **빨간색(1.0):** 같이 움직임 (위험 분산 안 됨) | **파란색(-1.0):** 반대로 움직임 (방어력 좋음)")
 				else:
 					st.warning("상관관계를 분석하려면 포트폴리오에 최소 2개 이상의 종목이 있어야 합니다!")
 			except Exception as e:
@@ -1012,52 +882,35 @@ try:
 	st.divider()
 
 	st.subheader("🧪 현실 고증 퀀트 시뮬레이션 (세금/수수료 반영)")
-	st.write("💡 **조건:** 지난 2년간 RSI 30 이하에서 전량 매수, 70 이상에서 전량 매도할 때, 현실의 비용을 떼고 내 손에 남는 진짜 돈은?")
-
+	st.write("💡 **조건:** 지난 2년간 RSI 30 이하에서 전량 매수, 70 이상에서 전량 매도할 때의 찐수익은?")
 	with st.expander("⚙️ 현실 세계 마찰력 설정 (슬리피지, 수수료, 세금)", expanded=True):
 		sim_col1, sim_col2, sim_col3 = st.columns(3)
 		capital = sim_col1.number_input("초기 투자 금액 ($)", min_value=1000, value=10000, step=1000)
-		commission = sim_col2.number_input("증권사 거래 수수료 (%)", min_value=0.0, max_value=1.0, value=0.07, step=0.01) # 보통 0.07% 정도
-		slippage = sim_col3.number_input("슬리피지 오차 (%)", min_value=0.0, max_value=2.0, value=0.1, step=0.05) # 시장가 매매 시 오차
-		
-		st.caption("※ 한국 거주자 기준: 해외주식 매매차익은 연 250만 원(약 $1,850) 공제 후 22% 양도소득세 부과")
+		commission = sim_col2.number_input("증권사 거래 수수료 (%)", min_value=0.0, max_value=1.0, value=0.07, step=0.01) 
+		slippage = sim_col3.number_input("슬리피지 오차 (%)", min_value=0.0, max_value=2.0, value=0.1, step=0.05) 
+		st.caption("※ 해외주식 매매차익은 연 250만 원(약 $1,850) 공제 후 22% 양도소득세 부과")
 
 	cash = capital
 	shares = 0
-	total_fees_paid = 0 # 증권사에 낸 수수료 총합
+	total_fees_paid = 0 
 
 	for i in range(len(df)):
 		price = df['Close'].iloc[i]
 		rsi = df['RSI'].iloc[i]
-
-		# 🟢 매수 로직 (현실 반영)
 		if rsi <= 30 and cash > 0: 
-			# 1. 슬리피지 적용: 내가 본 가격보다 미세하게 '비싸게' 사짐
 			buy_price = price * (1 + (slippage / 100))
-			
-			# 2. 수수료 차감: 내 현금에서 수수료를 먼저 뗌
 			fee = cash * (commission / 100)
 			total_fees_paid += fee
-			
-			# 3. 진짜 살 수 있는 주식 수 계산
-			investable_cash = cash - fee
-			shares = investable_cash / buy_price
+			shares = (cash - fee) / buy_price
 			cash = 0
-			
-		# 🔴 매도 로직 (현실 반영)
 		elif rsi >= 70 and shares > 0: 
-			# 1. 슬리피지 적용: 내가 본 가격보다 미세하게 '싸게' 팔림
 			sell_price = price * (1 - (slippage / 100))
-			
-			# 2. 매도 금액 계산 및 수수료 차감
 			gross_proceeds = shares * sell_price
 			fee = gross_proceeds * (commission / 100)
 			total_fees_paid += fee
-			
 			cash = gross_proceeds - fee
 			shares = 0
 
-	# 🏁 최종 가치 계산 (오늘까지 안 팔고 들고 있다면 현재 주가로 가치 계산, 팔 때의 수수료/슬리피지도 가상으로 빼줌)
 	if shares > 0:
 		final_sell_price = df['Close'].iloc[-1] * (1 - (slippage / 100))
 		gross_val = shares * final_sell_price
@@ -1065,68 +918,48 @@ try:
 	else:
 		final_value = cash
 
-	# 💸 세금 계산 로직 (양도소득세)
 	total_profit = final_value - capital
 	tax_amount = 0
-	taxable_threshold_usd = 1850 # 250만 원을 달러로 환산 (약 $1850)
-
+	taxable_threshold_usd = 1850 
 	if total_profit > taxable_threshold_usd:
-		# 250만 원을 초과한 수익금에 대해서만 22% 세금 부과
 		tax_amount = (total_profit - taxable_threshold_usd) * 0.22 
 
 	net_final_value = final_value - tax_amount
 	net_profit_pct = ((net_final_value - capital) / capital) * 100
 
-	# --- 화면 출력 ---
 	b_col1, b_col2, b_col3 = st.columns(3)
 	b_col1.metric("초기 투자 금액", f"${capital:,.2f}")
-	
-	if net_profit_pct > 0:
-		b_col2.metric("세후 최종 통장 잔고", f"${net_final_value:,.2f}", f"+{net_profit_pct:.2f}% (찐수익)")
-	else:
-		b_col2.metric("세후 최종 통장 잔고", f"${net_final_value:,.2f}", f"{net_profit_pct:.2f}% (찐수익)")
-
+	b_col2.metric("세후 최종 통장 잔고", f"${net_final_value:,.2f}", f"{net_profit_pct:+.2f}% (찐수익)")
 	b_col3.metric("💸 뜯긴 돈 (수수료+세금)", f"-${(total_fees_paid + tax_amount):,.2f}")
 
 	if tax_amount > 0:
-		st.error(f"🚨 삐빅! 수익이 250만 원을 초과하여 양도소득세 **${tax_amount:,.2f}**가 부과되었습니다. (국세청이 좋아합니다)")
+		st.error(f"🚨 수익이 250만 원을 초과하여 양도소득세 **${tax_amount:,.2f}**가 부과되었습니다.")
 	else:
 		st.success("✅ 비과세 구간입니다! (수익이 250만 원 이하이거나 손실 중입니다.)")
 
 	st.subheader("⏳ 과거로 가는 타임머신 (적립식 투자 시뮬레이터)")
 	with st.expander(f"💸 만약 내가 매달 '{short_name}' 주식을 꾸준히 샀다면?"):
-		st.write(f"과거로 돌아가서 매월 일정한 금액으로 **{ticker_symbol}** 주식을 모아갔다면 지금 얼마가 되었을지 확인해 보세요!")
-		
 		dca_col1, dca_col2 = st.columns(2)
 		monthly_inv = dca_col1.number_input("매월 투자할 금액 (달러)", min_value=10, value=100, step=10)
-		invest_months = dca_col2.slider("투자 기간 (개월)", min_value=3, max_value=24, value=12) # 최대 2년(24개월)
+		invest_months = dca_col2.slider("투자 기간 (개월)", min_value=3, max_value=24, value=12) 
 		
 		if st.button("🚀 타임머신 출발!", type="primary", use_container_width=True):
 			with st.spinner("과거 데이터를 타고 시간을 거슬러 올라가는 중... 🌀"):
 				try:
 					df_dca = df.copy()
-					
-					df_monthly = df_dca.resample('M').last()
-					
-					df_monthly = df_monthly.tail(invest_months)
-					
+					df_monthly = df_dca.resample('M').last().tail(invest_months)
 					if len(df_monthly) < invest_months:
 						st.warning(f"💡 이 종목은 상장된 지 얼마 안 되어서 {len(df_monthly)}개월치 데이터만 시뮬레이션합니다.")
 					
-					total_shares = 0
-					total_invested = 0
-					history_invested = []
-					history_value = []
-					dates = []
+					total_shares, total_invested = 0, 0
+					history_invested, history_value, dates = [], [], []
 					
 					for date, row in df_monthly.iterrows():
 						price = row['Close']
 						if pd.isna(price): continue
-						
-						shares_bought = monthly_inv / price # 쪼개기 매수(소수점 주식) 가정
+						shares_bought = monthly_inv / price 
 						total_shares += shares_bought
 						total_invested += monthly_inv
-						
 						dates.append(date)
 						history_invested.append(total_invested)
 						history_value.append(total_shares * price)
@@ -1135,142 +968,98 @@ try:
 					profit_money = final_value - total_invested
 					profit_pct = (profit_money / total_invested) * 100 if total_invested > 0 else 0
 					
-					st.success(f"시뮬레이션 완료! 총 {len(dates)}개월 동안 꾸준히 모은 결과입니다.")
-					
 					res_col1, res_col2, res_col3 = st.columns(3)
 					res_col1.metric("내 통장에서 빠져나간 원금", f"${total_invested:,.2f}")
 					res_col2.metric("현재 평가 금액 (수익률)", f"${final_value:,.2f}", f"{profit_pct:.2f}%")
 					res_col3.metric("누적 모은 주식 수", f"{total_shares:.2f}주")
 					
 					fig_dca = go.Figure()
-					
 					fig_dca.add_trace(go.Scatter(x=dates, y=history_invested, mode='lines', name='총 투자 원금', line=dict(color='gray', width=2, dash='dash')))
-					
 					line_color = '#00ff88' if profit_money >= 0 else '#ff4b4b'
 					fig_dca.add_trace(go.Scatter(x=dates, y=history_value, mode='lines+markers', name='실제 평가 금액', line=dict(color=line_color, width=3)))
-					
-					fig_dca.update_layout(
-						title=f"매월 ${monthly_inv}씩 {ticker_symbol}에 투자했을 때의 자산 변화",
-						template="plotly_dark",
-						xaxis_title="투자 기간",
-						yaxis_title="금액 (USD)",
-						hovermode="x unified",
-						height=400,
-						margin=dict(l=20, r=20, t=40, b=20)
-					)
+					fig_dca.update_layout(template="plotly_dark", height=400)
 					st.plotly_chart(fig_dca, use_container_width=True)
-					
-					if profit_pct > 0:
-						st.balloons()
-						st.info("💡 역시 우상향하는 주식에 적립식으로 꾸준히 장기 투자하는 게 정답이네요! 시간과 복리의 마법입니다. 🧙‍♂️")
-					else:
-						st.warning("🥲 하락장에서는 적립식 투자도 손실을 피할 순 없네요. 하지만 비쌀 때나 쌀 때나 꾸준히 사서 '평균 단가'를 낮추는 방어 효과는 확실했습니다!")
-						
 				except Exception as e:
 					st.error(f"시뮬레이션 중 오류가 발생했습니다: {e}")
-	
-	st.subheader("AI 딥러닝(LSTM) 내일 주가 예측")
-	st.write("딥러닝 모델이 과거 10일치 패턴을 학습 중...⏳")
 
-	df_clean = df.dropna()
-	features = ['Close', '20일_이동평균', '60일_이동평균', '수익률', 'RSI', 'MACD']
+	# --- ✨ 리팩토링 2: 딥러닝 버튼화 ---
+	st.subheader("🤖 AI 딥러닝(LSTM) 내일 주가 예측")
+	st.write("과거 10일 치의 주가, 이동평균, RSI, MACD 패턴을 분석해 내일의 주가 방향을 예측합니다.")
 
-	scaler = MinMaxScaler()
-	scaled_data = scaler.fit_transform(df_clean[features])
+	if st.button("🧠 딥러닝 모델 학습 및 예측 실행", use_container_width=True):
+		with st.spinner("AI가 최근 주가 패턴을 맹렬히 학습하고 있습니다... (약 5~10초 소요) ⏳"):
+			try:
+				df_clean = df.dropna()
+				features = ['Close', '20일_이동평균', '60일_이동평균', '수익률', 'RSI', 'MACD']
+				scaler = MinMaxScaler()
+				scaled_data = scaler.fit_transform(df_clean[features])
 
-	time_step = 10
-	X_lstm, y_lstm = [], []
-	for i in range(len(scaled_data) - time_step):
-		X_lstm.append(scaled_data[i:(i + time_step)])
-		y_lstm.append(df_clean['Target'].iloc[i + time_step])
+				time_step = 10
+				X_lstm, y_lstm = [], []
+				for i in range(len(scaled_data) - time_step):
+					X_lstm.append(scaled_data[i:(i + time_step)])
+					y_lstm.append(df_clean['Target'].iloc[i + time_step])
 
-	X_lstm, y_lstm = np.array(X_lstm), np.array(y_lstm)
+				X_lstm, y_lstm = np.array(X_lstm), np.array(y_lstm)
 
-	model = Sequential()
-	model.add(LSTM(50, return_sequences=False, input_shape=(X_lstm.shape[1], X_lstm.shape[2])))
-	model.add(Dense(1, activation='sigmoid'))
-	model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+				model = Sequential()
+				model.add(LSTM(50, return_sequences=False, input_shape=(X_lstm.shape[1], X_lstm.shape[2])))
+				model.add(Dense(1, activation='sigmoid'))
+				model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-	model.fit(X_lstm, y_lstm, epochs=5, batch_size=16, verbose=0)
+				model.fit(X_lstm, y_lstm, epochs=5, batch_size=16, verbose=0)
 
-	last_10_days = scaled_data[-time_step:]
-	last_10_days = np.expand_dims(last_10_days, axis=0)
+				last_10_days = scaled_data[-time_step:]
+				last_10_days = np.expand_dims(last_10_days, axis=0)
+				prediction_prob = model.predict(last_10_days, verbose=0)[0][0]
 
-	prediction_prob = model.predict(last_10_days, verbose=0)[0][0]
-
-	if prediction_prob > 0.5:
-		st.success(f"딥러닝 예측: 내일은 **상승**할 확률이 높습니다! (상승 확률: {prediction_prob*100:.1f}%)")
-	else:
-		st.error(f"딥러닝 예측: 내일은 **하락**할 확률이 높습니다. (하락 확률: {(1-prediction_prob)*100:.1f}%)")
+				if prediction_prob > 0.5:
+					st.success(f"📈 **딥러닝 예측:** 내일은 **상승**할 확률이 높습니다! (상승 확률: {prediction_prob*100:.1f}%)")
+				else:
+					st.error(f"📉 **딥러닝 예측:** 내일은 **하락**할 확률이 높습니다. (하락 확률: {(1-prediction_prob)*100:.1f}%)")
+			except Exception as e:
+				st.warning("데이터가 부족하여 딥러닝 모델을 학습할 수 없습니다.")
 
 	st.divider()
 
 	st.subheader(f"📊 {ticker_symbol} 전문가용 캔들 차트 (최근 1년)")
-
 	df_chart = df.tail(252)
-
 	fig = go.Figure(data=[go.Candlestick(
-		x=df_chart.index,
-		open=df_chart['Open'],
-		high=df_chart['High'],
-		low=df_chart['Low'],
-		close=df_chart['Close'],
-		name='주가 캔들'
+		x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
+		low=df_chart['Low'], close=df_chart['Close'], name='주가 캔들'
 	)])
-
 	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['20일_이동평균'], mode='lines', name='20일 이동평균', line=dict(color='orange', width=1.5)))
 	fig.add_trace(go.Scatter(x=df_chart.index, y=df_chart['60일_이동평균'], mode='lines', name='60일 이동평균', line=dict(color='blue', width=1.5)))
-
-	fig.update_layout(
-		xaxis_rangeslider_visible=False,
-		template='plotly_dark',
-		margin=dict(l=20, r=20, t=40, b=20),
-		height=500,
-		yaxis_title='주가 (USD)'
-	)
-
+	fig.update_layout(xaxis_rangeslider_visible=False, template='plotly_dark', height=500, yaxis_title='주가 (USD)')
 	st.plotly_chart(fig, use_container_width=True)
 
 	st.subheader("RSI (상대강도지수) 차트 - 30 밑이면 매수, 70 위면 매도")
 	st.line_chart(df['RSI'].tail(252))
 
 	st.subheader("📰 최신 뉴스 & Gemini AI 3줄 요약")
-
 	if st.button("🚀 Gemini AI 뉴스 3줄 요약 실행하기"):
 		with st.spinner("AI가 월스트리트 뉴스를 싹 다 읽고 있습니다... ⏳"):
 			try:
 				news_md, ai_summary, sentiment_score = get_news_and_ai_summary(ticker_symbol)
-
 				if news_md:
 						st.markdown(news_md)
 						st.divider()
-						
 						st.subheader("🤖 AI가 평가한 오늘의 뉴스 감성 점수")
 						score_col1, score_col2 = st.columns([1, 4])
-
-						with score_col1:
-							st.metric("감성 점수 (0~100)", f"{sentiment_score}점")
-
+						with score_col1: st.metric("감성 점수 (0~100)", f"{sentiment_score}점")
 						with score_col2:
 							st.write("")
 							st.progress(sentiment_score / 100.0)
-
-							if sentiment_score >= 70:
-								st.success("시장 분위기가 아주 좋습니다! 강력한 호재가 예상됩니다. 🚀")
-							elif sentiment_score <= 30:
-								st.error("시장 분위기가 얼어붙었습니다. 리스크 관리에 주의하세요! 🥶")
-							else:
-								st.warning("시장 분위기가 미지근합니다. 특별한 호재도 악재도 없네요. 😐")
+							if sentiment_score >= 70: st.success("시장 분위기가 아주 좋습니다! 강력한 호재가 예상됩니다. 🚀")
+							elif sentiment_score <= 30: st.error("시장 분위기가 얼어붙었습니다. 리스크 관리에 주의하세요! 🥶")
+							else: st.warning("시장 분위기가 미지근합니다. 특별한 호재도 악재도 없네요. 😐")
 						st.divider()
 						st.write("🧠 **Gemini AI 상세 분석 리포트**")
 						st.info(ai_summary)
 				else:
 						st.write(ai_summary)
 			except Exception as e:
-				if "429" in str(e) or "quota" in str(e).lower():
-					st.warning("⏳ 구글 API 한도를 초과했습니다. 잠시 후 다시 버튼을 눌러주세요!")
-				else:
-					st.warning(f"에러가 발생했습니다: {e}")
+				st.warning("⏳ 구글 API 한도를 초과했거나 에러가 발생했습니다. 잠시 후 다시 시도해 주세요!")
 	else:
 		st.info("👆 위 버튼을 누르면 인공지능이 최신 뉴스를 읽고 분석해 줍니다! (할당량 절약 모드)")
 
@@ -1282,47 +1071,33 @@ try:
 
 	st.divider()
 
-	# --- ✨ 궁극기 4: 몬테카를로 시뮬레이션 (미래 평행우주 예측) ---
 	st.subheader("🎲 닥터 스트레인지의 평행우주 (몬테카를로 시뮬레이션)")
 	with st.expander(f"1년 뒤 '{short_name}' 주식에 일어날 수 있는 수많은 미래 엿보기", expanded=False):
 		st.write("과거의 주가 변동성(위험)과 평균 수익률을 바탕으로 수학적 난수(주사위)를 발생시켜, 미래 주가의 확률적 분포를 시뮬레이션합니다.")
-
 		try:
-			# 1. 과거 데이터로 평균 수익률(mu)과 일일 변동성(sigma) 계산
 			daily_returns = df['Close'].pct_change().dropna()
 			mu = daily_returns.mean()
 			sigma = daily_returns.std()
 
 			mc_c1, mc_c2, mc_c3 = st.columns(3)
-			
-			sim_days = mc_c1.slider("시뮬레이션 기간 (거래일)", 30, 252, 252) # 252일 = 대략 1년
+			sim_days = mc_c1.slider("시뮬레이션 기간 (거래일)", 30, 252, 252) 
 			sim_paths = mc_c2.slider("생성할 평행우주(시나리오) 개수", 10, 500, 100)
-			
-			# AI가 계산한 값을 기본값으로 세팅 (사용자가 수정 가능)
 			user_mu = mc_c3.number_input("일평균 기대 수익률 (%)", value=float(mu * 100), step=0.01) / 100
 			user_sigma = mc_c3.number_input("일일 변동성 (리스크) (%)", value=float(sigma * 100), step=0.1) / 100
 
 			if st.button("🎲 수백 개의 미래 엿보기 (시뮬레이션 실행)", type="primary", use_container_width=True):
 				with st.spinner("수백 개의 평행우주를 겹쳐서 그리는 중... 🌀"):
 					last_price = df['Close'].iloc[-1]
-					
-					# 2. 몬테카를로 시뮬레이션 매트릭스 생성 (기하학적 브라운 운동 - GBM 모델)
 					simulation_df = pd.DataFrame()
-					
 					for x in range(sim_paths):
-						# 매일매일의 무작위 충격(Z) 생성
 						shock = np.random.normal(loc=user_mu - (0.5 * user_sigma**2), scale=user_sigma, size=sim_days)
 						price_path = last_price * np.exp(np.cumsum(shock))
 						simulation_df[x] = price_path
 						
-					# 3. 시각화 (Plotly)
 					fig_mc = go.Figure()
-					
-					# 모든 평행우주 선 그리기 (투명도를 낮춰서 거미줄처럼 표현)
 					for x in range(sim_paths):
 						fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=simulation_df[x], mode='lines', line=dict(color='rgba(0, 176, 246, 0.05)'), showlegend=False, hoverinfo='skip'))
 						
-					# 굵은 선으로 통계적 요약(중앙값, 상/하위 5%) 표시
 					median_path = simulation_df.median(axis=1)
 					top_5_path = simulation_df.quantile(0.95, axis=1)
 					bottom_5_path = simulation_df.quantile(0.05, axis=1)
@@ -1331,17 +1106,9 @@ try:
 					fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=top_5_path, mode='lines', name='상위 5% 초대박 우주', line=dict(color='lime', width=2, dash='dash')))
 					fig_mc.add_trace(go.Scatter(x=list(range(sim_days)), y=bottom_5_path, mode='lines', name='하위 5% 최악의 우주', line=dict(color='red', width=2, dash='dash')))
 					
-					fig_mc.update_layout(
-						title=f"'{ticker_symbol}'의 향후 {sim_days}일 주가 시나리오 ({sim_paths}번 시뮬레이션)",
-						xaxis_title="경과 일수 (Days)",
-						yaxis_title="예상 주가 (USD)",
-						template="plotly_dark",
-						height=500,
-						hovermode="x unified"
-					)
+					fig_mc.update_layout(title=f"'{ticker_symbol}' 향후 {sim_days}일 주가 시나리오", template="plotly_dark", height=500, hovermode="x unified")
 					st.plotly_chart(fig_mc, use_container_width=True)
 					
-					# 4. 결과 요약
 					final_median = median_path.iloc[-1]
 					final_top = top_5_path.iloc[-1]
 					final_bottom = bottom_5_path.iloc[-1]
@@ -1351,22 +1118,17 @@ try:
 					m_col1.metric("가장 현실적인 미래 (중앙값)", fmt_price(final_median), f"{((final_median/last_price)-1)*100:.1f}%")
 					m_col2.metric("상위 5% 대박 시나리오", fmt_price(final_top), f"{((final_top/last_price)-1)*100:.1f}%")
 					m_col3.metric("하위 5% 폭망 시나리오 (최악)", fmt_price(final_bottom), f"{((final_bottom/last_price)-1)*100:.1f}%")
-					
-					st.info("💡 **결과 해석:** 이 시뮬레이션은 '내일 무조건 이 가격이 된다'가 아니라, **'과거의 널뛰기(변동성) 패턴을 볼 때 내 돈이 반토막 날 최악의 확률(하위 5%)이 어느 정도인지 리스크를 미리 점검'**하는 데 쓰는 방어형 무기입니다!")
-					
 		except Exception as e:
 			st.error(f"시뮬레이션 중 오류가 발생했습니다: {e}")
 
 	st.divider()
 
-	# --- ✨ 궁극기 5: 원클릭 AI PDF(HTML) 리포트 자동 생성기 ---
 	st.subheader("📄 원클릭 AI 종합 리포트 생성기")
 	st.write("지금까지 분석한 모든 팩트 데이터와 AI의 인사이트를 한 장의 깔끔한 보고서로 요약해 줍니다.")
 
 	if st.button("📝 AI 리포트 작성 시작 (약 10초 소요)", type="primary", use_container_width=True):
 		with st.spinner("AI가 월스트리트 수준의 리포트를 작성 중입니다... ⏳"):
 			try:
-				# 1. AI에게 데이터 던져주고 리포트 작성 지시하기
 				report_model = genai.GenerativeModel('gemini-3-flash-preview')
 				report_prompt = f"""
 				너는 월스트리트 최고의 퀀트 애널리스트야. 다음 데이터를 바탕으로 '{short_name} ({ticker_symbol})'에 대한 투자 리포트를 작성해.
@@ -1385,7 +1147,6 @@ try:
 				"""
 				report_response = report_model.generate_content(report_prompt)
 
-				# 2. 예쁜 디자인이 입혀진 HTML 템플릿에 AI 답변 씌우기
 				html_report = f"""
 				<!DOCTYPE html>
 				<html lang="ko">
@@ -1405,9 +1166,7 @@ try:
 					<div class="container">
 						<h1>📈 {short_name} ({ticker_symbol}) 종합 분석 리포트</h1>
 						<div class="date-badge">📅 발행일: {pd.Timestamp.now().strftime('%Y년 %m월 %d일')}</div>
-						
 						{report_response.text}
-						
 						<div class="footer">
 							<p>※ 본 리포트는 AI 비서가 데이터를 기반으로 자동 생성한 것이며, 투자 결과에 대한 법적 책임을 지지 않습니다.</p>
 							<p>Generated by My Quant HTS System</p>
@@ -1417,21 +1176,11 @@ try:
 				</html>
 				"""
 
-				# 3. 화면에 다운로드 버튼 제공
 				st.success("🎉 리포트 생성이 완료되었습니다!")
 				st.info("💡 **PDF 저장 꿀팁:** 다운로드한 HTML 파일을 크롬 브라우저로 열고, **`Ctrl + P` (인쇄)를 누른 뒤 'PDF로 저장'**을 선택하면 완벽한 PDF 리포트가 완성됩니다.")
-
-				st.download_button(
-					label="📥 AI 리포트 다운로드 (클릭!)",
-					data=html_report,
-					file_name=f"{ticker_symbol}_AI_Report.html",
-					mime="text/html"
-				)
-
-				# 미리보기 화면 제공
+				st.download_button(label="📥 AI 리포트 다운로드 (클릭!)", data=html_report, file_name=f"{ticker_symbol}_AI_Report.html", mime="text/html")
 				with st.expander("👀 리포트 미리보기", expanded=True):
 					st.components.v1.html(html_report, height=600, scrolling=True)
-
 			except Exception as e:
 				st.error(f"리포트 생성 중 오류가 발생했습니다: {e}")
 
@@ -1456,9 +1205,7 @@ try:
 			with st.spinner("AI 비서가 차트와 뉴스를 분석하며 답변을 작성 중입니다... ✍️"):
 				try:
 					chat_model = genai.GenerativeModel('gemini-3-flash-preview')
-					
 					system_prompt = f"너는 월스트리트 수석 퀀트 분석가이자 친절한 주식 멘토야. 현재 사용자는 '{ticker_symbol}' 주식 데이터를 보고 있어. 질문에 전문적이고 친절하게 대답해 줘. 질문: {chat_input}"
-					
 					response = chat_model.generate_content(system_prompt)
 					
 					st.markdown(response.text)
