@@ -655,6 +655,95 @@ try:
 
 	st.divider()
 
+	# --- ✨ 장기 투자 무기 1: DCF (현금흐름할인법) 계산기 ---
+	st.subheader("🔮 기업의 '진짜 가치' 찾기 (DCF 모델)")
+	with st.expander("워렌 버핏처럼 기업의 적정 주가를 직접 계산해 보세요!", expanded=True):
+		st.write("회사가 미래에 벌어들일 잉여현금흐름(FCF)을 추정하여 현재 가치로 할인하는 절대 가치 평가 모델입니다.")
+		
+		try:
+			# 야후 파이낸스 장부에서 DCF 계산에 필요한 재료들 훔쳐오기!
+			recent_fcf = 0
+			if not cashflow.empty and 'Free Cash Flow' in cashflow.index:
+				recent_fcf = cashflow.loc['Free Cash Flow'].iloc[0]
+			
+			shares_out = fund_info.get('sharesOutstanding', 0)
+			total_cash = fund_info.get('totalCash', 0)
+			total_debt = fund_info.get('totalDebt', 0)
+			
+			if pd.isna(recent_fcf): recent_fcf = 0
+			
+			st.info("💡 야후 파이낸스에서 최근 재무 데이터를 자동으로 불러왔습니다. (데이터가 0이라면 다른 사이트를 참고해 직접 입력해 주세요!)")
+			
+			dcf_col1, dcf_col2 = st.columns(2)
+			
+			with dcf_col1:
+				st.markdown("🏢 **[1단계] 현재 기초 체력 (자동 입력됨)**")
+				input_fcf = st.number_input("최근 1년 잉여현금흐름 (FCF)", value=float(recent_fcf), step=1000000.0, format="%f")
+				input_shares = st.number_input("발행 주식수", value=float(shares_out), step=1000000.0, format="%f")
+				input_cash = st.number_input("보유 현금", value=float(total_cash), step=1000000.0, format="%f")
+				input_debt = st.number_input("총 부채", value=float(total_debt), step=1000000.0, format="%f")
+				
+			with dcf_col2:
+				st.markdown("📈 **[2단계] 미래 성장률 & 할인율 가정**")
+				growth_1_5 = st.slider("향후 1~5년 예상 성장률 (%)", -10.0, 50.0, 15.0, 1.0)
+				growth_6_10 = st.slider("향후 6~10년 예상 성장률 (%)", -10.0, 30.0, 10.0, 1.0)
+				discount_rate = st.slider("할인율 (WACC, 요구수익률) (%)", 5.0, 20.0, 10.0, 0.5)
+				terminal_growth = st.slider("영구 성장률 (10년 이후) (%)", 0.0, 5.0, 2.5, 0.1)
+				
+			if st.button("📊 이 조건으로 적정 주가 계산하기", type="primary", use_container_width=True):
+				if input_fcf <= 0 or input_shares <= 0:
+					st.warning("FCF(잉여현금흐름)와 발행 주식수는 0보다 커야 정상적인 계산이 가능합니다. (회사가 적자 상태면 DCF를 쓰기 어렵습니다!)")
+				elif discount_rate <= terminal_growth:
+					st.warning("수학적 오류! 할인율은 영구 성장률보다 커야 합니다.")
+				else:
+					with st.spinner("미래의 현금흐름을 현재 가치로 끌어오는 중... ⏳"):
+						# 1. 향후 10년 현금흐름 예측 및 현재 가치로 할인
+						future_fcfs = []
+						current_proj_fcf = input_fcf
+						
+						for year in range(1, 11):
+							if year <= 5: current_proj_fcf *= (1 + (growth_1_5 / 100))
+							else: current_proj_fcf *= (1 + (growth_6_10 / 100))
+								
+							discounted_fcf = current_proj_fcf / ((1 + (discount_rate / 100)) ** year)
+							future_fcfs.append(discounted_fcf)
+							
+						sum_discounted_fcf = sum(future_fcfs)
+						
+						# 2. 영구 가치(Terminal Value) 계산 및 할인
+						terminal_value = (current_proj_fcf * (1 + (terminal_growth / 100))) / ((discount_rate / 100) - (terminal_growth / 100))
+						discounted_tv = terminal_value / ((1 + (discount_rate / 100)) ** 10)
+						
+						# 3. 기업 가치(Enterprise Value) 및 주주 가치(Equity Value) 산출
+						enterprise_value = sum_discounted_fcf + discounted_tv
+						equity_value = enterprise_value + input_cash - input_debt
+						
+						# 4. 1주당 적정 주가 산출
+						intrinsic_value = equity_value / input_shares
+						
+						# 안전 마진(Margin of Safety) 계산
+						margin_of_safety = ((intrinsic_value - current_price) / current_price) * 100 if current_price > 0 else 0
+							
+						# 결과 출력
+						st.success("계산 완료! 시장이 평가하는 가격과 데이터가 말하는 진짜 가치를 비교해 보세요.")
+						res_c1, res_c2, res_c3 = st.columns(3)
+						res_c1.metric("현재 시장 주가", fmt_price(current_price))
+						
+						if intrinsic_value > 0:
+							res_c2.metric("내가 계산한 적정 주가", fmt_price(intrinsic_value))
+							if margin_of_safety > 0:
+								res_c3.metric("안전 마진 (저평가율)", f"+{margin_of_safety:.1f}%", "저평가 (매수 찬스!)")
+								st.info(f"💡 현재 주가보다 적정 가치가 **{margin_of_safety:.1f}%** 더 높습니다! 워렌 버핏이 좋아하는 '안전 마진'이 확보된 바겐세일 상태일 수 있습니다.")
+							else:
+								res_c3.metric("안전 마진 (고평가율)", f"{margin_of_safety:.1f}%", "고평가 (거품 주의)")
+								st.warning(f"⚠️ 현재 주가가 적정 가치보다 비쌉니다. 회사의 미래 성장에 대한 시장의 기대감이 너무 높거나 거품이 끼어있을 수 있으니 주의하세요!")
+						else:
+							st.error("계산된 적정 주가가 마이너스입니다. 회사의 빚이 너무 많거나 현금흐름이 꼬여있습니다.")
+		except Exception as e:
+			st.error(f"DCF 데이터를 준비하는 중 오류가 발생했습니다: {e}")
+            
+	st.divider()
+
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
 
