@@ -932,37 +932,6 @@ try:
 
 	st.divider()
 
-	st.subheader("🕸️ 포트폴리오 종목 상관관계 (분산투자 리스크 점검)")
-	st.write("내 포트폴리오의 주식들이 서로 얼마나 비슷하게 움직이는지 확인해 보세요.")
-	if st.button("📊 상관관계 히트맵 그리기"):
-		with st.spinner("포트폴리오 전체 데이터를 수학적으로 분석 중입니다... ⏳"):
-			try:
-				all_tickers = []
-				for theme, tickers in st.session_state['portfolio'].items():
-					all_tickers.extend(tickers)
-				all_tickers = list(set(all_tickers))
-				if len(all_tickers) > 1:
-					close_prices = pd.DataFrame()
-					for t in all_tickers:
-						df_temp, _ = load_data(t)
-						if not df_temp.empty: close_prices[t] = df_temp['Close']
-					returns = close_prices.pct_change().dropna()
-					corr_matrix = returns.corr()
-					fig_corr = go.Figure(data=go.Heatmap(
-						z=corr_matrix.values, x=corr_matrix.columns, y=corr_matrix.index,
-						colorscale='RdBu_r', zmin=-1, zmax=1,
-						text=np.round(corr_matrix.values, 2), texttemplate="%{text}", hoverinfo="text"
-					))
-					fig_corr.update_layout(template="plotly_dark", height=500, margin=dict(l=20, r=20, t=20, b=20))
-					st.plotly_chart(fig_corr, use_container_width=True)
-					st.info("💡 **빨간색(1.0):** 같이 움직임 (위험 분산 안 됨) | **파란색(-1.0):** 반대로 움직임 (방어력 좋음)")
-				else:
-					st.warning("상관관계를 분석하려면 포트폴리오에 최소 2개 이상의 종목이 있어야 합니다!")
-			except Exception as e:
-				st.error(f"데이터 분석 중 에러가 발생했습니다: {e}")
-
-	st.divider()
-
 	st.subheader("🧪 현실 고증 퀀트 시뮬레이션 (세금/수수료 반영)")
 	st.write("💡 **조건:** 지난 2년간 RSI 30 이하에서 전량 매수, 70 이상에서 전량 매도할 때의 찐수익은?")
 	with st.expander("⚙️ 현실 세계 마찰력 설정 (슬리피지, 수수료, 세금)", expanded=True):
@@ -1018,51 +987,6 @@ try:
 		st.error(f"🚨 수익이 250만 원을 초과하여 양도소득세 **${tax_amount:,.2f}**가 부과되었습니다.")
 	else:
 		st.success("✅ 비과세 구간입니다! (수익이 250만 원 이하이거나 손실 중입니다.)")
-
-	st.subheader("⏳ 과거로 가는 타임머신 (적립식 투자 시뮬레이터)")
-	with st.expander(f"💸 만약 내가 매달 '{short_name}' 주식을 꾸준히 샀다면?"):
-		dca_col1, dca_col2 = st.columns(2)
-		monthly_inv = dca_col1.number_input("매월 투자할 금액 (달러)", min_value=10, value=100, step=10)
-		invest_months = dca_col2.slider("투자 기간 (개월)", min_value=3, max_value=24, value=12) 
-		
-		if st.button("🚀 타임머신 출발!", type="primary", use_container_width=True):
-			with st.spinner("과거 데이터를 타고 시간을 거슬러 올라가는 중... 🌀"):
-				try:
-					df_dca = df.copy()
-					df_monthly = df_dca.resample('M').last().tail(invest_months)
-					if len(df_monthly) < invest_months:
-						st.warning(f"💡 이 종목은 상장된 지 얼마 안 되어서 {len(df_monthly)}개월치 데이터만 시뮬레이션합니다.")
-					
-					total_shares, total_invested = 0, 0
-					history_invested, history_value, dates = [], [], []
-					
-					for date, row in df_monthly.iterrows():
-						price = row['Close']
-						if pd.isna(price): continue
-						shares_bought = monthly_inv / price 
-						total_shares += shares_bought
-						total_invested += monthly_inv
-						dates.append(date)
-						history_invested.append(total_invested)
-						history_value.append(total_shares * price)
-					
-					final_value = total_shares * current_price
-					profit_money = final_value - total_invested
-					profit_pct = (profit_money / total_invested) * 100 if total_invested > 0 else 0
-					
-					res_col1, res_col2, res_col3 = st.columns(3)
-					res_col1.metric("내 통장에서 빠져나간 원금", f"${total_invested:,.2f}")
-					res_col2.metric("현재 평가 금액 (수익률)", f"${final_value:,.2f}", f"{profit_pct:.2f}%")
-					res_col3.metric("누적 모은 주식 수", f"{total_shares:.2f}주")
-					
-					fig_dca = go.Figure()
-					fig_dca.add_trace(go.Scatter(x=dates, y=history_invested, mode='lines', name='총 투자 원금', line=dict(color='gray', width=2, dash='dash')))
-					line_color = '#00ff88' if profit_money >= 0 else '#ff4b4b'
-					fig_dca.add_trace(go.Scatter(x=dates, y=history_value, mode='lines+markers', name='실제 평가 금액', line=dict(color=line_color, width=3)))
-					fig_dca.update_layout(template="plotly_dark", height=400)
-					st.plotly_chart(fig_dca, use_container_width=True)
-				except Exception as e:
-					st.error(f"시뮬레이션 중 오류가 발생했습니다: {e}")
 
 	# --- ✨ 리팩토링 2: 딥러닝 버튼화 ---
 	st.subheader("🤖 AI 딥러닝(LSTM) 내일 주가 예측")
