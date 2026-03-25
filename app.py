@@ -332,11 +332,30 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 				current_p = info_temp.get('currentPrice') or info_temp.get('regularMarketPrice')
 				if not current_p: current_p = df_temp['Close'].iloc[-1]
 				
-				# ✨ 개별 주식 배당금 자동 계산
-				div_yield = info_temp.get('dividendYield', 0) if info_temp.get('dividendYield') else 0
+				# ✨ 1주당 실제 배당금(달러/원) 확실하게 가져오기
+				div_rate = info_temp.get('dividendRate', 0)
+				div_yield = info_temp.get('dividendYield', 0)
+				
+				# (혹시 API가 % 단위로 뻥튀기해서 줄 때를 대비한 안전장치)
+				if div_yield and div_yield > 1: 
+					div_yield = div_yield / 100
 			except:
 				current_p = info_dict['avg_price']
+				div_rate = 0
 				div_yield = 0
+			
+			shares = info_dict['shares']
+			avg_price = info_dict['avg_price']
+			
+			profit_pct = ((current_p - avg_price) / avg_price) * 100
+			profit_amount = (current_p - avg_price) * shares
+			current_total_value = current_p * shares
+			
+			# ✨ 1년 예상 배당금 계산 (가장 정확한 1주당 배당금(Rate) 우선 사용!)
+			if div_rate:
+				expected_annual_div = shares * div_rate
+			else:
+				expected_annual_div = current_total_value * div_yield
 			
 			shares = info_dict['shares']
 			avg_price = info_dict['avg_price']
