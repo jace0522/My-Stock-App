@@ -1113,11 +1113,50 @@ try:
 	else:
 		st.info("👆 위 버튼을 누르면 인공지능이 최신 뉴스를 읽고 분석해 줍니다! (할당량 절약 모드)")
 
-	st.subheader("거래량 (Volume)")
-	st.bar_chart(df['Volume'])
+	st.divider()
 
-	st.write("최근 데이터 확인하기:")
-	st.dataframe(df.tail())
+	# --- ✨ 거래량 심층 분석 업그레이드 ---
+	st.subheader("🔥 거래량(Volume) 심층 분석: 시장의 진짜 돈의 흐름")
+	
+	with st.expander("📖 주가는 속여도 거래량은 못 속인다? (거래량 보는 법)", expanded=False):
+		st.info("""
+		* 📈 **주가 상승 + 거래량 폭발:** 세력(기관/외국인)이 진짜 돈을 싸들고 들어왔다는 뜻입니다. 가장 강력한 **진짜 상승 신호(찐반등)**입니다.
+		* 📉 **주가 하락 + 거래량 폭발:** 누군가 엄청난 물량을 시장에 집어 던지고 도망갔다는 뜻입니다. **강력한 하락 신호(패닉셀)**입니다.
+		* 🥱 **거래량 가뭄:** 시장의 관심이 식었음을 의미합니다. 이때 주가가 찔끔찔끔 오르는 건 적은 돈으로 쉽게 조작될 수 있는 '가짜 상승(속임수)'일 확률이 높습니다.
+		* 💡 **차트 해석 꿀팁:** 빨간색/초록색 막대가 **주황색 점선(20일 평균 거래량)**을 시원하게 뚫고 솟아오른 날을 주목하세요! 그날이 바로 변곡점입니다.
+		""")
+
+	# 거래량 차트 예쁘게 그리기 (업/다운 색상 구분 + 20일 평균선)
+	df_vol = df.tail(120).copy() # 너무 길면 안 보이니까 최근 6개월(120일)만 돋보기로 확대!
+	df_vol['Volume_MA20'] = df_vol['Volume'].rolling(window=20).mean()
+	
+	# 양봉(오른 날)은 초록색, 음봉(내린 날)은 빨간색으로 칠하기
+	df_vol['Color'] = np.where(df_vol['Close'] >= df_vol['Open'], 'rgba(0, 255, 136, 0.7)', 'rgba(255, 75, 75, 0.7)') 
+
+	fig_vol = go.Figure()
+	# 1. 일일 거래량 막대그래프
+	fig_vol.add_trace(go.Bar(
+		x=df_vol.index, 
+		y=df_vol['Volume'], 
+		marker_color=df_vol['Color'], 
+		name='일일 거래량'
+	))
+	# 2. 20일 평균 거래량 선 (이 선을 넘으면 '폭발'한 것!)
+	fig_vol.add_trace(go.Scatter(
+		x=df_vol.index, 
+		y=df_vol['Volume_MA20'], 
+		mode='lines', 
+		line=dict(color='orange', width=2, dash='dot'), 
+		name='20일 평균선'
+	))
+	fig_vol.update_layout(
+		template="plotly_dark", 
+		height=300, 
+		margin=dict(l=20, r=20, t=30, b=20),
+		showlegend=False,
+		hovermode="x unified"
+	)
+	st.plotly_chart(fig_vol, use_container_width=True)
 
 	st.divider()
 
