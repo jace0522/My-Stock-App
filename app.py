@@ -314,61 +314,118 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	my_cash = st.session_state['account']['cash']
 	my_holdings = st.session_state['account']['holdings']
 
-	# 1. 계산을 위한 초기 뼈대
 	total_stock_value_usd = 0.0
-	STARTING_BALANCE = 10000.0 # 맨 처음 시작한 기본 자본금 ($10,000)
-	current_krw_rate = get_exchange_rate() # 한국 주식 달러 환산용 실시간 환율
+	total_expected_div_usd = 0.0 # ✨ 추가된 연간 배당금 합산 변수
+	STARTING_BALANCE = 10000.0
+	current_krw_rate = get_exchange_rate()
 
 	if my_holdings:
 		st.write("📦 **보유 주식 상세 내역:**")
 		
-		for ticker, info in my_holdings.items():
+		for ticker, info_dict in my_holdings.items():
 			is_kr = ticker.endswith('.KS') or ticker.endswith('.KQ')
 			sym = "₩" if is_kr else "$"
 			decimals = 0 if is_kr else 2
 			
-			# 현재가 실시간으로 긁어오기 (캐시 활용해서 빠르게!)
 			try:
 				df_temp, info_temp = load_data(ticker)
 				current_p = info_temp.get('currentPrice') or info_temp.get('regularMarketPrice')
 				if not current_p: current_p = df_temp['Close'].iloc[-1]
+				
+				# ✨ 개별 주식 배당금 자동 계산
+				div_yield = info_temp.get('dividendYield', 0) if info_temp.get('dividendYield') else 0
 			except:
-				current_p = info['avg_price'] # 혹시 에러 나면 평단가로 임시 처리
+				current_p = info_dict['avg_price']
+				div_yield = 0
 			
-			shares = info['shares']
-			avg_price = info['avg_price']
+			shares = info_dict['shares']
+			avg_price = info_dict['avg_price']
 			
-			# 수익금 & 수익률 계산
 			profit_pct = ((current_p - avg_price) / avg_price) * 100
 			profit_amount = (current_p - avg_price) * shares
 			current_total_value = current_p * shares
+			expected_annual_div = current_total_value * div_yield # ✨ 1년 예상 배당금
 			
-			# 총자산(USD) 합산을 위한 달러 환산
 			if is_kr:
 				total_stock_value_usd += (current_total_value / current_krw_rate)
+				total_expected_div_usd += (expected_annual_div / current_krw_rate)
 			else:
 				total_stock_value_usd += current_total_value
+				total_expected_div_usd += expected_annual_div
 				
-			# 화면에 예쁘게 띄우기 (빨간색/초록색 화살표 적용)
 			arrow = "🔴" if profit_pct < 0 else "🟢"
 			plus = "+" if profit_pct > 0 else ""
 			
-			st.markdown(f"- **{ticker}** | {shares}주 | 평단가: {sym}{avg_price:,.{decimals}f} ➔ **현재가: {sym}{current_p:,.{decimals}f}** |  {arrow} **{plus}{profit_pct:.2f}%** (수익금: {sym}{profit_amount:,.{decimals}f})")
+			st.markdown(f"- **{ticker}** | {shares}주 | 평단가: {sym}{avg_price:,.{decimals}f} ➔ **현재가: {sym}{current_p:,.{decimals}f}** |  {arrow} **{plus}{profit_pct:.2f}%** | 💸 연 배당금: {sym}{expected_annual_div:,.{decimals}f}")
 			
 	else:
 		st.info("현재 보유 중인 주식이 없습니다. 맘에 드는 종목을 매수해 보세요!")
 
-	# 2. 내 총 계좌 요약 (현금 + 현재 주식 가치)
+	# 2. 내 총 계좌 요약
 	st.divider()
 	total_account_value = my_cash + total_stock_value_usd
 	total_profit_pct = ((total_account_value / STARTING_BALANCE) - 1) * 100
 	
 	st.write("💰 **총 계좌 요약:**")
-	acc_c1, acc_c2 = st.columns(2)
+	acc_c1, acc_c2, acc_c3 = st.columns(3)
 	acc_c1.metric("보유 현금 (달러)", f"${my_cash:,.2f}")
-	
-	# 수익이 났으면 초록색(+), 잃었으면 빨간색(-)으로 자동 표시
-	acc_c2.metric("총 계좌 자산 (현금 + 주식)", f"${total_account_value:,.2f}", f"{total_profit_pct:+.2f}% (원금 $10,000 대비)")
+	acc_c2.metric("총 계좌 자산", f"${total_account_value:,.2f}", f"{total_profit_pct:+.2f}% (원금 $10,000 대비)")
+	acc_c3.metric("🎉 내 포트폴리오 연간 배당금", f"${total_expected_div_usd:,.2f}", "가만히 있어도 들어오는 꽁돈!")
+
+	# ✨ 3. 내 실제 계좌 기반 배당 재투자(DRIP) 시뮬레이터!
+	if total_expected_div_usd > 0:
+		with st.expander("❄️ 내 계좌 배당 재투자(DRIP) 스노우볼 굴려보기", expanded=False):
+			st.write("지금 세팅된 포트폴리오의 배당금을 빼 쓰지 않고 계속 재투자한다면?")
+			drip_c1, drip_c2, drip_c3 = st.columns(3)
+			
+			port_cagr = drip_c1.number_input("포트폴리오 평균 예상 상승률 (%)", value=8.0, step=1.0)
+			
+			# 내 계좌의 실제 평균 배당률을 AI가 역산해서 딱 꽂아줌!
+			port_div_yield = (total_expected_div_usd / total_stock_value_usd) * 100 if total_stock_value_usd > 0 else 0
+			drip_c2.metric("내 계좌의 실제 평균 배당률", f"{port_div_yield:.2f}%")
+			
+			monthly_add = drip_c3.number_input("매월 추가 납입금 ($)", value=500, step=100)
+			invest_years = st.slider("투자 유지 기간 (년)", 1, 40, 20, key='port_drip_years')
+
+			if st.button("❄️ 내 포트폴리오 스노우볼 굴리기 (시작)", use_container_width=True):
+				with st.spinner("내 계좌의 복리 마법을 계산 중입니다... ⏳"):
+					months = invest_years * 12
+					monthly_return = port_cagr / 100 / 12
+					monthly_dividend = port_div_yield / 100 / 12
+					
+					data_records = []
+					total_principal = total_account_value
+					current_balance_no_drip = total_account_value
+					current_balance_drip = total_account_value
+					
+					for m in range(1, months + 1):
+						total_principal += monthly_add
+						current_balance_no_drip = current_balance_no_drip * (1 + monthly_return) + monthly_add
+						current_balance_drip = current_balance_drip * (1 + monthly_return + monthly_dividend) + monthly_add
+						
+						if m % 12 == 0:
+							data_records.append({
+								"Year": m // 12,
+								"원금 (Principal)": total_principal,
+								"주가 수익만 (No DRIP)": current_balance_no_drip,
+								"배당 재투자 (DRIP)": current_balance_drip
+							})
+					
+					df_drip = pd.DataFrame(data_records)
+					
+					st.success(f"시간이 무기입니다! {invest_years}년 후 내 계좌의 놀라운 결과입니다.")
+					r_col1, r_col2, r_col3 = st.columns(3)
+					r_col1.metric("총 투입 원금 (현재 자산 + 납입금)", f"${total_principal:,.0f}")
+					r_col2.metric("배당금 안 합친 최종 자산", f"${current_balance_no_drip:,.0f}")
+					drip_bonus = current_balance_drip - current_balance_no_drip
+					r_col3.metric("배당 재투자 시 최종 자산", f"${current_balance_drip:,.0f}", f"+${drip_bonus:,.0f} (스노우볼 효과!)")
+					
+					fig_snow = go.Figure()
+					fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['원금 (Principal)'], fill='tozeroy', mode='none', name='내 순수 원금', fillcolor='rgba(128, 128, 128, 0.2)'))
+					fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['주가 수익만 (No DRIP)'], fill='tonexty', mode='none', name='단순 주가 상승분', fillcolor='rgba(0, 176, 246, 0.4)'))
+					fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['배당 재투자 (DRIP)'], fill='tonexty', mode='none', name='배당 재투자 (복리의 마법)', fillcolor='rgba(0, 255, 136, 0.6)'))
+					fig_snow.update_layout(title=f"현재 내 포트폴리오 기반 자산 증식 시뮬레이션", xaxis_title="투자 기간 (년)", yaxis_title="자산 규모 (USD)", template="plotly_dark", hovermode="x unified", height=500)
+					st.plotly_chart(fig_snow, use_container_width=True)
 
 st.divider()
 
@@ -441,10 +498,19 @@ try:
 	short_name = info.get('shortName', ticker_symbol)
 	st.subheader(f"🏢 {short_name} 요약 정보")
 
-	col1, col2, col3 = st.columns(3)
+	# ✨ 배당률 정보 추가
+	dividend_yield = info.get('dividendYield', 0) * 100 if info.get('dividendYield') else 0.0
+	dividend_rate = info.get('dividendRate', 0)
+
+	col1, col2, col3, col4 = st.columns(4)
 	col1.metric("현재 주가", fmt_price(current_price))
 	col2.metric("PER (주가수익비율)", f"{per:.2f}" if per > 0 else "N/A")
 	col3.metric("52주 최고가", fmt_price(high_52))
+	
+	if dividend_yield > 0:
+		col4.metric("배당수익률", f"{dividend_yield:.2f}%", f"연 {fmt_price(dividend_rate)}")
+	else:
+		col4.metric("배당수익률", "배당 없음")
 
 	st.write("### 모의투자 매수 / 매도")
 
@@ -712,88 +778,6 @@ try:
 		except Exception as e:
 			st.error(f"DCF 데이터를 준비하는 중 오류가 발생했습니다: {e}")
             
-	st.divider()
-
-	st.subheader("❄️ 시간과 복리의 마법 (배당 재투자 시뮬레이터)")
-	with st.expander("워렌 버핏의 스노우볼! 배당금을 안 쓰고 계속 재투자한다면?", expanded=False):
-		st.write("주가 상승분뿐만 아니라, 매년 나오는 배당금을 다시 해당 주식을 사는 데 썼을 때(DRIP) 자산이 어떻게 기하급수적으로 증식하는지 확인해 보세요.")
-
-		drip_c1, drip_c2, drip_c3 = st.columns(3)
-		initial_cap = drip_c1.number_input("초기 투자 금액 ($)", value=10000, step=1000)
-		monthly_cont = drip_c1.number_input("매월 추가 투자금 ($)", value=500, step=100)
-		
-		try:
-			start_price = df['Close'].iloc[0]
-			end_price = df['Close'].iloc[-1]
-			years_passed = len(df) / 252 
-			if years_passed > 0 and end_price > 0 and start_price > 0:
-				auto_cagr = ((end_price / start_price) ** (1 / years_passed) - 1) * 100
-				auto_cagr = max(-30.0, min(auto_cagr, 100.0)) 
-			else:
-				auto_cagr = 8.0
-		except:
-			auto_cagr = 8.0
-
-		yield_pct = fund_info.get('dividendYield')
-		if not yield_pct:
-			try:
-				div_history = stock_obj.dividends
-				if not div_history.empty:
-					last_1y_div = div_history.last("365D").sum()
-					yield_pct = last_1y_div / current_price
-				else:
-					yield_pct = 0.0
-			except:
-				yield_pct = 0.0
-		
-		auto_div_yield = float(yield_pct) * 100 if yield_pct else 0.0
-		
-		st.info(f"💡 AI가 분석한 이 종목의 최근 연평균 수익률은 **{auto_cagr:.1f}%**, 배당률은 **{auto_div_yield:.2f}%**입니다. (아래 입력창에 자동 세팅되었습니다!)")
-
-		expected_return = drip_c2.number_input("예상 연평균 주가 상승률 (%)", value=round(float(auto_cagr), 1), step=1.0)
-		dividend_yield = drip_c2.number_input("예상 연평균 배당 수익률 (%)", value=round(float(auto_div_yield), 2), step=0.1)
-		invest_years = drip_c3.slider("투자를 유지할 기간 (년)", min_value=1, max_value=40, value=20)
-		
-		if st.button("❄️ 스노우볼 굴리기 (시뮬레이션 시작)", type="primary", use_container_width=True):
-			with st.spinner("복리의 마법을 계산 중입니다... ⏳"):
-				months = invest_years * 12
-				monthly_return = expected_return / 100 / 12
-				monthly_dividend = dividend_yield / 100 / 12
-				data_records = []
-				total_principal = initial_cap
-				current_balance_no_drip = initial_cap
-				current_balance_drip = initial_cap
-				
-				for m in range(1, months + 1):
-					total_principal += monthly_cont
-					current_balance_no_drip = current_balance_no_drip * (1 + monthly_return) + monthly_cont
-					current_balance_drip = current_balance_drip * (1 + monthly_return + monthly_dividend) + monthly_cont
-					
-					if m % 12 == 0:
-						data_records.append({
-							"Year": m // 12,
-							"원금 (Principal)": total_principal,
-							"주가 수익만 (No DRIP)": current_balance_no_drip,
-							"배당 재투자 (DRIP)": current_balance_drip
-						})
-				
-				df_drip = pd.DataFrame(data_records)
-				st.success(f"시간이 무기입니다! {invest_years}년 후의 놀라운 결과입니다.")
-				r_col1, r_col2, r_col3 = st.columns(3)
-				r_col1.metric("내가 넣은 순수 원금", f"${total_principal:,.0f}")
-				r_col2.metric("배당금 뺀 최종 자산 (주가만 상승)", f"${current_balance_no_drip:,.0f}")
-				drip_bonus = current_balance_drip - current_balance_no_drip
-				r_col3.metric("배당 재투자 시 최종 자산", f"${current_balance_drip:,.0f}", f"+${drip_bonus:,.0f} (스노우볼 효과!)")
-				
-				fig_snow = go.Figure()
-				fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['원금 (Principal)'], fill='tozeroy', mode='none', name='내 순수 원금', fillcolor='rgba(128, 128, 128, 0.2)'))
-				fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['주가 수익만 (No DRIP)'], fill='tonexty', mode='none', name='단순 주가 상승분', fillcolor='rgba(0, 176, 246, 0.4)'))
-				fig_snow.add_trace(go.Scatter(x=df_drip['Year'], y=df_drip['배당 재투자 (DRIP)'], fill='tonexty', mode='none', name='배당 재투자 (복리의 마법)', fillcolor='rgba(0, 255, 136, 0.6)'))
-				fig_snow.update_layout(title=f"매월 ${monthly_cont}씩 투자할 때의 자산 변화", xaxis_title="투자 기간 (년)", yaxis_title="자산 규모 (USD)", template="plotly_dark", hovermode="x unified", height=500)
-				st.plotly_chart(fig_snow, use_container_width=True)
-				
-				st.info("💡 **초록색이 바로 배당금을 다시 투자해서 만든 '공짜 복리 수익'입니다.** 기간이 길어질수록 초록색 영역이 하늘로 솟구치는 걸 확인하세요!")
-
 	st.divider()
 
 	st.subheader("🏭 산업(Sector) 맞춤형 심층 분석")
