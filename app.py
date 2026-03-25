@@ -546,7 +546,7 @@ try:
 
 	with st.expander("📊 재무제표 & 핵심 지표 열어보기 (진짜 돈 넣기 전 필수 확인!)"):
 		with st.spinner("야후 파이낸스에서 기업의 재무 장부를 뒤지고 있습니다... ⏳"):
-				try:
+			try:
 				stock_obj = yf.Ticker(ticker_symbol)
 				financials = stock_obj.financials
 				balance_sheet = stock_obj.balance_sheet
