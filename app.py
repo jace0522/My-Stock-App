@@ -874,22 +874,61 @@ try:
 	df['수익률'] = df['Close'].pct_change()
 	df['Target'] = np.where(df['Close'].shift(-1) > df['Close'], 1, 0)
 
-	st.subheader("🎯 매수/매도 타이밍 분석")
+	st.subheader("🎯 매수/매도 타이밍 분석 (기술적 지표)")
+
+	with st.expander("📖 RSI, MACD, 정배열... 차트 지표가 무슨 뜻인가요?", expanded=False):
+		st.info("""
+		* 📊 **RSI (상대강도지수):** 주식이 최근 얼마나 미친 듯이 오르고 내렸는지를 0~100으로 나타낸 '온도계'입니다. **30 밑이면 사람들이 패닉셀을 해서 너무 싸진 상태(바겐세일 매수 찬스)**, **70 위면 광기가 껴서 너무 비싸진 상태(거품 붕괴 주의, 매도)**로 봅니다.
+		* 📈 **MACD (추세 방향):** 주가의 단기 흐름과 장기 흐름이 만나는 지점을 분석합니다. MACD 선이 Signal 선을 **뚫고 위로 올라가면 '이제부터 오름세 시작(매수)'**, **아래로 꺾여서 내려가면 '이제부터 내림세 시작(매도)'**을 의미합니다.
+		* 🌟 **이동평균선 (정배열/역배열):** 최근 20일간의 평균 주가가 과거 60일간의 평균 주가보다 위에 있는 것을 **'정배열'**이라고 합니다. 이는 최근 주가 흐름이 더 좋아져서 **안정적으로 우상향(상승장)**하고 있다는 뜻이죠. 반대로 20일 선이 아래로 처박히면 **'역배열(하락장)'**입니다.
+		""")
+
 	latest_rsi = df['RSI'].iloc[-1]
 	latest_macd = df['MACD'].iloc[-1]
 	latest_signal = df['Signal_Line'].iloc[-1]
+	ma_20 = df['20일_이동평균'].iloc[-1]
+	ma_60 = df['60일_이동평균'].iloc[-1]
 
+	# ✨ AI의 똑똑한 종합 판단을 위한 점수 매기기 로직
+	score = 0
+	
 	c1, c2, c3 = st.columns(3)
 	with c1:
-		if latest_rsi <= 30: st.success(f"📊 RSI: {latest_rsi:.1f}\n\n🔥 **강한 매수 찬스 (과매도)**")
-		elif latest_rsi >= 70: st.error(f"📊 RSI: {latest_rsi:.1f}\n\n⚠️ **매도 주의 (과매수)**")
-		else: st.info(f"📊 RSI: {latest_rsi:.1f}\n\n➖ **보통 (관망)**")
+		if latest_rsi <= 30: 
+			st.success(f"📊 RSI 온도계: {latest_rsi:.1f}\n\n🔥 **강한 매수 찬스 (과매도)**\n\n(사람들이 던져서 헐값입니다!)")
+			score += 1
+		elif latest_rsi >= 70: 
+			st.error(f"📊 RSI 온도계: {latest_rsi:.1f}\n\n⚠️ **매도 주의 (과매수)**\n\n(광기가 껴서 비싼 상태입니다!)")
+			score -= 1
+		else: 
+			st.info(f"📊 RSI 온도계: {latest_rsi:.1f}\n\n➖ **보통 (관망)**\n\n(과열되지 않은 평범한 상태)")
+			
 	with c2:
-		if latest_macd > latest_signal: st.success(f"📈 MACD 흐름\n\n**상승 추세 (매수 시그널)**")
-		else: st.error(f"📉 MACD 흐름\n\n**하락 추세 (조심!)**")
+		if latest_macd > latest_signal: 
+			st.success(f"📈 MACD 추세선\n\n**상승 추세 (매수 시그널)**\n\n(MACD가 시그널을 돌파했습니다!)")
+			score += 1
+		else: 
+			st.error(f"📉 MACD 추세선\n\n**하락 추세 (조심!)**\n\n(MACD가 시그널 아래로 꺾였습니다.)")
+			score -= 1
+			
 	with c3:
-		if df['20일_이동평균'].iloc[-1] > df['60일_이동평균'].iloc[-1]: st.success("🌟 이동평균선\n\n**정배열 (상승세)**")
-		else: st.error("🌧️ 이동평균선\n\n**역배열 (하락세)**")
+		if ma_20 > ma_60: 
+			st.success(f"🌟 이동평균선\n\n**정배열 (안정적 상승세)**\n\n(단기 흐름이 장기 흐름을 이겼습니다!)")
+			score += 1
+		else: 
+			st.error(f"🌧️ 이동평균선\n\n**역배열 (하락세 지속)**\n\n(단기 흐름이 꺾여서 흘러내리는 중입니다.)")
+			score -= 1
+
+	# ✨ 점수를 바탕으로 최종 결론 내려주기
+	st.write("### 🤖 차트 지표 종합 평가 의견")
+	if score >= 2:
+		st.success("🟢 **[종합 의견: 적극 매수 찬스!]**\n차트 흐름이 매우 좋습니다. 바닥을 치고 올라오는 바겐세일 구간이거나, 안정적인 우상향 상승장을 탔습니다. 매수를 적극적으로 고려해 볼 만한 훌륭한 타이밍입니다.")
+	elif score == 1:
+		st.info("🟡 **[종합 의견: 분할 매수 / 지켜보기]**\n전반적인 흐름은 나쁘지 않지만 확실한 대세 상승장은 아닙니다. 섣불리 한 번에 다 사기보다는 조금씩 나누어 사거나(분할매수), 며칠 더 지켜보는 것을 추천합니다.")
+	elif score == -1:
+		st.warning("🟠 **[종합 의견: 비중 축소 / 주의]**\n차트가 조금씩 무너지고 있습니다. 새로 사는 것은 추천하지 않으며, 이미 주식을 들고 있다면 수익을 조금 챙겨두는(부분 매도) 방어적인 전략이 필요합니다.")
+	else: # score <= -2
+		st.error("🔴 **[종합 의견: 매수 금지 / 도망치세요!]**\n차트가 완전히 꺾인 하락장이거나 거품이 심하게 낀 상태입니다. '떨어지는 칼날'을 맨손으로 잡지 마세요! 지금은 매수 버튼에서 손을 떼고 도망쳐야 할 때입니다.")
 
 	st.divider()
 
