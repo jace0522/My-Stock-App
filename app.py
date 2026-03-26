@@ -25,32 +25,31 @@ st.set_page_config(page_title="나만의 AI 퀀트 비서", page_icon="🚀", la
 
 st.markdown("""
 <style>
-    /* 1. 불필요한 상단 여백 줄이기 (모바일 화면 낭비 방지) */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    
-    /* 2. 우측 상단 Streamlit 기본 메뉴 숨기기 (진짜 내 앱처럼!) */
-    #MainMenu {visibility: hidden;}
-    
-    /* 3. 하단 'Made with Streamlit' 워터마크 꼬리표 숨기기 */
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* 4. 숫자 요약(Metric) 박스를 예쁜 라운드 카드 형태로 묶어주기 */
-    div[data-testid="metric-container"] {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 15px;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
-    }
-    /* 모바일에서 카드 누를 때 살짝 들어가는 터치 애니메이션 */
-    div[data-testid="metric-container"]:active {
-        transform: scale(0.98);
-    }
+	/* 1. 불필요한 상단 여백 줄이기 (모바일 화면 낭비 방지) */
+	.block-container {
+		padding-top: 2rem;
+		padding-bottom: 2rem;
+	}
+	
+	/* 2. 우측 상단 Streamlit 기본 메뉴 숨기기 (진짜 내 앱처럼!) */
+	#MainMenu {visibility: hidden;}
+	
+	/* 3. 하단 워터마크 꼬리표 숨기기 (단, header는 사이드바 버튼을 위해 살려둡니다!) */
+	footer {visibility: hidden;}
+		
+	/* 4. 숫자 요약(Metric) 박스를 예쁜 라운드 카드 형태로 묶어주기 */
+	div[data-testid="metric-container"] {
+		background-color: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		padding: 15px;
+		border-radius: 15px;
+		box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+		transition: transform 0.2s;
+	}
+	/* 모바일에서 카드 누를 때 살짝 들어가는 터치 애니메이션 */
+	div[data-testid="metric-container"]:active {
+		transform: scale(0.98);
+	}
 </style>
 """, unsafe_allow_html=True)
 
