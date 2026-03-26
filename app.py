@@ -299,7 +299,7 @@ selected_ticker = st.sidebar.radio(
 st.sidebar.divider()
 st.sidebar.subheader("🔔 매수 타이밍 알림 봇")
 
-if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
+if st.sidebar.button("🚀 바겐세일 종목 스캔 & 알림 쏘기"):
 	with st.spinner("전체 종목의 RSI를 분석 중입니다..."):
 		buy_list = []
 		for theme, tickers in st.session_state['portfolio'].items():
@@ -315,30 +315,48 @@ if st.sidebar.button("🚀 포트폴리오 전체 스캔 및 메일 전송"):
 					df_temp['RSI'] = 100 - (100 / (1 + rs))
 					latest_rsi = df_temp['RSI'].iloc[-1]
 					if latest_rsi <= 30:
-						buy_list.append(f"✅ {t} (현재 RSI: {latest_rsi:.1f}) - {theme}")
+						buy_list.append(f"✅ **{t}** (현재 RSI: {latest_rsi:.1f}) - {theme}")
 				except:
 					pass
 
 		if buy_list:
+			# 알림 메시지 예쁘게 포맷팅
+			alert_message = "🚨 **[주식 AI 봇] 바겐세일 매수 타이밍 포착!** 🚨\n\n" + "\n".join(buy_list) + "\n\n👉 *당장 앱에 접속해서 차트를 확인하세요!*"
+			
+			# 1. 🎮 디스코드 웹훅 전송
 			try:
-				sender = st.secrets["email"]["sender"]
-				password = st.secrets["email"]["password"]
-				receiver = st.secrets["email"]["receiver"]
-
-				email_body = "다음 종목들의 RSI가 30 이하로 떨어졌습니다. 바겐세일 매수 타이밍을 확인하세요!\n\n" + "\n".join(buy_list)
-				msg = MIMEText(email_body)
-				msg['Subject'] = "[주식 AI 봇] 강한 매수 찬스 알림!"
-				msg['From'] = sender
-				msg['To'] = receiver
-
-				with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-					server.login(sender, password)
-					server.send_message(msg)
-				st.sidebar.success("매수 추천 종목을 이메일로 성공적으로 발송했습니다!")
+				if "discord" in st.secrets and "webhook_url" in st.secrets["discord"]:
+					discord_url = st.secrets["discord"]["webhook_url"]
+					payload = {"content": alert_message}
+					res = requests.post(discord_url, json=payload)
+					if res.status_code == 204:
+						st.sidebar.success("🎮 디스코드로 매수 타이밍을 전송했습니다!")
+					else:
+						st.sidebar.warning(f"디스코드 전송 실패 (상태 코드: {res.status_code})")
 			except Exception as e:
-				st.sidebar.error("❌ 이메일 전송 실패! 스트림릿 Secrets 설정을 확인해 주세요.")
+				st.sidebar.error(f"디스코드 연동 에러: {e}")
+
+			# 2. 📧 이메일 전송 (기존 기능 유지)
+			try:
+				if "email" in st.secrets:
+					sender = st.secrets["email"]["sender"]
+					password = st.secrets["email"]["password"]
+					receiver = st.secrets["email"]["receiver"]
+
+					email_body = alert_message.replace("**", "") # 이메일에서는 마크다운 별표 제거
+					msg = MIMEText(email_body)
+					msg['Subject'] = "[주식 AI 봇] 강한 매수 찬스 알림!"
+					msg['From'] = sender
+					msg['To'] = receiver
+
+					with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+						server.login(sender, password)
+						server.send_message(msg)
+					st.sidebar.success("📧 이메일로도 발송을 완료했습니다!")
+			except Exception as e:
+				st.sidebar.warning("이메일 전송은 실패했습니다. (Secrets 설정을 확인하세요)")
 		else:
-			st.sidebar.info("지금은 RSI 30 이하인 바겐세일 종목이 없습니다.")
+			st.sidebar.info("지금은 RSI 30 이하인 바겐세일 종목이 없습니다. (총알을 아끼세요!)")
 
 # --- 메인 화면 ---
 st.title("주식 AI 분석 앱")
