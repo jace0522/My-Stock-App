@@ -20,6 +20,40 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 
+# --- ✨ 모바일 최적화 & 진짜 앱처럼 보이게 만드는 마법의 CSS ---
+	st.set_page_config(page_title="나만의 AI 퀀트 비서", page_icon="🚀", layout="wide", initial_sidebar_state="auto")
+
+	st.markdown("""
+	<style>
+		/* 1. 불필요한 상단 여백 줄이기 (모바일 화면 낭비 방지) */
+		.block-container {
+			padding-top: 2rem;
+			padding-bottom: 2rem;
+		}
+		
+		/* 2. 우측 상단 Streamlit 기본 메뉴 숨기기 (진짜 내 앱처럼!) */
+		#MainMenu {visibility: hidden;}
+		
+		/* 3. 하단 'Made with Streamlit' 워터마크 꼬리표 숨기기 */
+		footer {visibility: hidden;}
+		header {visibility: hidden;}
+		
+		/* 4. 숫자 요약(Metric) 박스를 예쁜 라운드 카드 형태로 묶어주기 */
+		div[data-testid="metric-container"] {
+			background-color: rgba(255, 255, 255, 0.05);
+			border: 1px solid rgba(255, 255, 255, 0.1);
+			padding: 15px;
+			border-radius: 15px;
+			box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+			transition: transform 0.2s;
+		}
+		/* 모바일에서 카드 누를 때 살짝 들어가는 터치 애니메이션 */
+		div[data-testid="metric-container"]:active {
+			transform: scale(0.98);
+		}
+	</style>
+	""", unsafe_allow_html=True)
+
 # --- ✨ 리팩토링 1: 앱 설정 및 AI API 글로벌 세팅 ---
 st.set_page_config(layout="wide")
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
