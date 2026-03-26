@@ -877,6 +877,40 @@ try:
 			except Exception as e:
 				st.warning(f"산업 세부 지표를 불러오는 데 실패했습니다: {e}")
 
+# --- ✨ 신규 기능: 내부자 거래 & 기관 수급 추적 ---
+	st.divider()
+	st.subheader("🕵️‍♂️ 내부자 거래 & 기관 수급 추적 (돈의 흐름)")
+	with st.expander(f"'{short_name}'의 회장님과 거대 자본은 이 주식을 사고 있을까?", expanded=False):
+		st.info("""
+		* 👔 **내부자 지분율:** CEO나 임원진이 회사 주식을 얼마나 들고 있는지 보여줍니다. 비율이 높을수록 회사 미래에 대한 자신감이 크다는 뜻입니다. (특히 폭락장에서의 내부자 매수는 강력한 호재입니다!)
+		* 🏦 **기관 지분율:** 블랙록, 뱅가드 같은 글로벌 큰손들이 얼마나 투자했는지 보여줍니다. 이 비율이 높으면 주가가 쉽게 무너지지 않는 든든한 방어막 역할을 합니다.
+		""")
+		
+		try:
+			stock_obj = yf.Ticker(ticker_symbol)
+			
+			# 야후 파이낸스 info에서 지분율 데이터 가져오기
+			insider_pct = info.get('heldPercentInsiders', 0)
+			inst_pct = info.get('heldPercentInstitutions', 0)
+			
+			# 데이터가 소수점(0.05)으로 들어올 때와 퍼센트(5)로 들어올 때를 방어하는 로직
+			if insider_pct is not None and insider_pct < 1: insider_pct *= 100
+			if inst_pct is not None and inst_pct < 1: inst_pct *= 100
+			
+			i_col1, i_col2 = st.columns(2)
+			i_col1.metric("👔 내부자 (경영진) 지분율", f"{insider_pct:.2f}%" if insider_pct else "데이터 없음")
+			i_col2.metric("🏦 글로벌 기관 지분율", f"{inst_pct:.2f}%" if inst_pct else "데이터 없음")
+			
+			st.write("📝 **최근 내부자 거래 동향 (Top 5)**")
+			insider_trades = stock_obj.insider_transactions
+			if insider_trades is not None and len(insider_trades) > 0:
+				st.dataframe(insider_trades.head(5), use_container_width=True)
+			else:
+				st.write("최근 보고된 경영진의 주식 매수/매도 내역이 없습니다.")
+				
+		except Exception as e:
+			st.warning("수급 데이터를 불러오는 데 실패했습니다.")
+
 	# --- 공통 지표 연산 (앱 전체에서 사용) ---
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
 	df['60일_이동평균'] = df['Close'].rolling(window=60).mean()
