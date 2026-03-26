@@ -1,10 +1,10 @@
 streamlit
-yfinance>=0.2.37
+yfinance
 pandas
 numpy
 scikit-learn
 vaderSentiment
-tensorflow-cpu
 firebase-admin
 google-generativeai
 plotly
+tensorflow
