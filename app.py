@@ -473,6 +473,72 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 
 st.divider()
 
+# --- ✨ 신규 기능: 나만의 퀀트 스크리너 ---
+st.subheader("🔎 나만의 퀀트 종목 발굴기 (미니 스크리너)")
+with st.expander("조건에 맞는 보석 같은 주식을 찾아보세요! (Top 우량주 & 내 관심종목 대상)", expanded=False):
+	st.write("설정한 조건에 완벽하게 일치하는 종목만 필터링해서 보여줍니다.")
+	
+	sc_col1, sc_col2, sc_col3 = st.columns(3)
+	max_per = sc_col1.number_input("최대 PER (이하)", value=20.0, step=1.0)
+	min_roe = sc_col2.number_input("최소 ROE (%) (이상)", value=15.0, step=1.0)
+	min_div = sc_col3.number_input("최소 배당수익률 (%) (이상)", value=1.0, step=0.5)
+
+	if st.button("🚀 조건에 맞는 종목 발굴하기", use_container_width=True):
+		with st.spinner("우량주와 내 관심종목 데이터를 맹렬히 스캔 중입니다... (약 10~20초 소요) ⏳"):
+			# 1. 검사할 종목 리스트 (미국 대형주 기본 탑재)
+			base_tickers = [
+				'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'JNJ', 'V', 
+				'PG', 'UNH', 'HD', 'MA', 'BAC', 'DIS', 'NFLX', 'AMD', 'INTC', 'KO', 
+				'PEP', 'CSCO', 'XOM', 'CVX', 'WMT', 'T', 'VZ', 'PFE', 'ABBV', 'MCD'
+			]
+			
+			# 2. 내 포트폴리오에 있는 종목도 검사 대상에 추가
+			for theme, tickers in st.session_state['portfolio'].items():
+				base_tickers.extend(list(tickers.keys()))
+			
+			# 중복 제거
+			search_list = list(set(base_tickers)) 
+			passed_stocks = []
+			
+			# 진행률 바 표시 (시각적 재미!)
+			progress_bar = st.progress(0)
+			
+			for idx, t in enumerate(search_list):
+				try:
+					# 빠른 스캔을 위해 info 데이터만 쏙 빼오기
+					t_info = yf.Ticker(t).info
+					
+					t_per = t_info.get('trailingPE', 0)
+					if t_per is None: t_per = 0
+					
+					t_roe = t_info.get('returnOnEquity', 0) * 100 if t_info.get('returnOnEquity') else 0
+					t_div = t_info.get('dividendYield', 0) * 100 if t_info.get('dividendYield') else 0
+					
+					# 3. 퀀트 조건 검사! (PER이 0보다 크고 조건보다 낮으며, ROE와 배당이 조건 이상일 때)
+					if (0 < t_per <= max_per) and (t_roe >= min_roe) and (t_div >= min_div):
+						passed_stocks.append({
+							"종목명": t_info.get('shortName', t),
+							"티커": t,
+							"PER": round(t_per, 2),
+							"ROE (%)": round(t_roe, 2),
+							"배당수익률 (%)": round(t_div, 2),
+							"현재가 (USD)": t_info.get('currentPrice', 0)
+						})
+				except:
+					pass
+				
+				# 진행률 애니메이션 업데이트
+				progress_bar.progress((idx + 1) / len(search_list))
+			
+			# 4. 결과 출력
+			if passed_stocks:
+				st.success(f"🎉 퀀트 조건에 맞는 보석 같은 종목 {len(passed_stocks)}개를 발견했습니다!")
+				df_screener = pd.DataFrame(passed_stocks)
+				# 인덱스 숨기고 깔끔하게 표출
+				st.dataframe(df_screener, use_container_width=True, hide_index=True)
+			else:
+				st.warning("조건에 맞는 종목이 없습니다. 조건을 조금 더 느슨하게(PER은 높게, 배당은 낮게) 조절해 보세요!")
+
 search_keyword = st.text_input("🔍 기업명(예: 애플, 삼성전자, Tesla) 또는 티커를 입력하세요:", selected_ticker)
 ticker_symbol = search_keyword.upper()
 
