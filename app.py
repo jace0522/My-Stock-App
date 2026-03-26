@@ -390,14 +390,6 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 			else:
 				expected_annual_div = current_total_value * div_yield
 			
-			shares = info_dict['shares']
-			avg_price = info_dict['avg_price']
-			
-			profit_pct = ((current_p - avg_price) / avg_price) * 100
-			profit_amount = (current_p - avg_price) * shares
-			current_total_value = current_p * shares
-			expected_annual_div = current_total_value * div_yield # ✨ 1년 예상 배당금
-			
 			if is_kr:
 				total_stock_value_usd += (current_total_value / current_krw_rate)
 				total_expected_div_usd += (expected_annual_div / current_krw_rate)
