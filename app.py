@@ -618,244 +618,239 @@ try:
 	
 	st.divider()
 
-	st.subheader("🏢 기업 기초체력 (펀더멘털) 분석")
-	
-	# ✨ 추가된 주린이용 친절한 펀더멘털 가이드!
-	with st.expander("📖 마진, ROE, 부채비율, 현금흐름이 무슨 뜻인가요?", expanded=False):
-		st.info("""
-		* 👑 **순이익률 (마진):** 10,000원짜리 물건을 팔았을 때 내 손에 진짜 떨어지는 돈이 얼마인지 보여줍니다. 20%면 2,000원이 남는 셈이죠. 애플이나 명품 브랜드처럼 **마진이 높을수록 가격을 맘대로 올릴 수 있는 슈퍼 갑(독점력)** 기업입니다.
-		* 📈 **자기자본이익률 (ROE):** '내 진짜 돈(자본)'을 굴려서 1년 동안 몇 %의 수익을 냈는지 보여줍니다. 투자의 신 워렌 버핏이 가장 사랑하는 지표로, 보통 **15% 이상 꾸준히 나오면 돈 복사기 수준의 훌륭한 기업**으로 평가받습니다.
-		* 🚨 **부채비율 (빚):** 내 진짜 돈 대비 은행 빚이 얼마나 있는지 보여줍니다. 보통 100% 이하면 아주 튼튼하고 안전하며, 이 숫자가 너무 높으면 금리가 비쌀 때 이자 내느라 회사가 허덕일 수 있습니다.
-		* 💵 **영업활동 현금흐름:** 장부상으로만 돈을 번 게 아니라, **실제로 회사 통장에 꽂힌 '진짜 현금'**을 의미합니다. 아무리 장부상 이익이 나도 현금이 마이너스(-)면 월급을 못 줘서 회사가 위험해질 수 있어요. 이건 무조건 플러스(+)여야 좋습니다!
-		""")
+	# ✨ ETF 스마트 판별기 (이 종목이 주식인지 ETF인지 확인)
+	is_etf = info.get('quoteType') == 'ETF'
 
-	with st.expander("📊 재무제표 & 핵심 지표 열어보기 (진짜 돈 넣기 전 필수 확인!)"):
-		with st.spinner("야후 파이낸스에서 기업의 재무 장부를 뒤지고 있습니다... ⏳"):
-			try:
-				stock_obj = yf.Ticker(ticker_symbol)
-				financials = stock_obj.financials
-				balance_sheet = stock_obj.balance_sheet
-				cashflow = stock_obj.cashflow
-				fund_info = stock_obj.info
-				
-				margin = fund_info.get('profitMargins', 0) * 100 if fund_info.get('profitMargins') else 0
-				if margin == 0 and not financials.empty:
-					try: margin = (financials.loc['Net Income'].iloc[0] / financials.loc['Total Revenue'].iloc[0]) * 100
-					except: pass
+	if is_etf:
+		st.subheader("🏢 ETF 심층 분석 안내")
+		st.info("💡 **안내:** 검색하신 종목은 개별 기업이 아닌 **ETF(상장지수펀드)**입니다. ETF는 여러 주식을 모아놓은 바구니이므로 개별 기업의 재무제표(영업이익, R&D)나 잉여현금흐름(DCF) 데이터가 존재하지 않습니다.\n\n대신 **아래의 매수/매도 타이밍 차트, 딥러닝 예측, 몬테카를로 시뮬레이션** 등은 ETF의 과거 가격과 거래량을 바탕으로 완벽하게 작동하니 안심하고 투자에 활용해 보세요! 🚀")
+		st.divider()
+	else:
+		st.subheader("🏢 기업 기초체력 (펀더멘털) 분석")
+		with st.expander("📖 마진, ROE, 부채비율, 현금흐름이 무슨 뜻인가요?", expanded=False):
+			st.info("""
+			* 👑 **순이익률 (마진):** 10,000원짜리 물건을 팔았을 때 내 손에 진짜 떨어지는 돈이 얼마인지 보여줍니다. 20%면 2,000원이 남는 셈이죠. 애플이나 명품 브랜드처럼 **마진이 높을수록 가격을 맘대로 올릴 수 있는 슈퍼 갑(독점력)** 기업입니다.
+			* 📈 **자기자본이익률 (ROE):** '내 진짜 돈(자본)'을 굴려서 1년 동안 몇 %의 수익을 냈는지 보여줍니다. 투자의 신 워렌 버핏이 가장 사랑하는 지표로, 보통 **15% 이상 꾸준히 나오면 돈 복사기 수준의 훌륭한 기업**으로 평가받습니다.
+			* 🚨 **부채비율 (빚):** 내 진짜 돈 대비 은행 빚이 얼마나 있는지 보여줍니다. 보통 100% 이하면 아주 튼튼하고 안전하며, 이 숫자가 너무 높으면 금리가 비쌀 때 이자 내느라 회사가 허덕일 수 있습니다.
+			* 💵 **영업활동 현금흐름:** 장부상으로만 돈을 번 게 아니라, **실제로 회사 통장에 꽂힌 '진짜 현금'**을 의미합니다. 아무리 장부상 이익이 나도 현금이 마이너스(-)면 월급을 못 줘서 회사가 위험해질 수 있어요. 이건 무조건 플러스(+)여야 좋습니다!
+			""")
+
+		with st.expander("📊 재무제표 & 핵심 지표 열어보기 (진짜 돈 넣기 전 필수 확인!)"):
+			with st.spinner("야후 파이낸스에서 기업의 재무 장부를 뒤지고 있습니다... ⏳"):
+				try:
+					stock_obj = yf.Ticker(ticker_symbol)
+					financials = stock_obj.financials
+					balance_sheet = stock_obj.balance_sheet
+					cashflow = stock_obj.cashflow
+					fund_info = stock_obj.info
 					
-				roe = fund_info.get('returnOnEquity', 0) * 100 if fund_info.get('returnOnEquity') else 0
-				if roe == 0:
-					try: roe = (financials.loc['Net Income'].iloc[0] / balance_sheet.loc['Stockholders Equity'].iloc[0]) * 100
-					except: pass
-					
-				debt_to_eq = fund_info.get('debtToEquity', 0) if fund_info.get('debtToEquity') else 0
-				if debt_to_eq == 0:
-					try: debt_to_eq = (balance_sheet.loc['Total Debt'].iloc[0] / balance_sheet.loc['Stockholders Equity'].iloc[0]) * 100
-					except: pass
-					
-				op_cashflow = fund_info.get('operatingCashflow', 0) if fund_info.get('operatingCashflow') else 0
-				if op_cashflow == 0:
-					try: op_cashflow = cashflow.loc['Operating Cash Flow'].iloc[0]
-					except: pass
-
-				st.write("💡 **핵심 펀더멘털 지표**")
-				f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-				
-				if margin >= 20:
-					f_col1.success(f"순이익률\n\n**{margin:.1f}%** (마진 끝판왕 👑)")
-				elif margin > 0:
-					f_col1.metric("순이익률 (마진)", f"{margin:.1f}%")
-				else:
-					f_col1.error(f"순이익률\n\n**{margin:.1f}%** (적자 상태 🚨)")
-					
-				f_col2.metric("자기자본이익률 (ROE)", f"{roe:.1f}%" if roe != 0 else "N/A")
-				f_col3.metric("부채비율 (빚)", f"{debt_to_eq:.1f}%" if debt_to_eq != 0 else "N/A")
-				
-				if op_cashflow != 0:
-					if "KS" in ticker_symbol or "KQ" in ticker_symbol:
-						cf_str = f"{op_cashflow / 100000000:,.0f}억 원"
-					else:
-						cf_str = f"${op_cashflow / 1000000:,.0f}M"
-				else:
-					cf_str = "N/A"
-				f_col4.metric("영업활동 현금흐름", cf_str)
-
-				st.divider()
-
-				st.write("📈 **최근 4년 매출액 vs 당기순이익 성적표** (우상향하는 기업이 최고!)")
-				st.caption("💡 주린이 꿀팁: 막대그래프 두 개(매출=회사의 덩치, 당기순이익=진짜 남긴 돈)가 매년 계단처럼 같이 **우상향**하고 있다면 장투하기 아주 좋은 우량주입니다!")
-				if not financials.empty:
-					fin_df = financials.T.head(4)[::-1]
-					if 'Total Revenue' in fin_df.columns and 'Net Income' in fin_df.columns:
-						chart_data = pd.DataFrame({
-							'매출액 (Revenue)': fin_df['Total Revenue'],
-							'당기순이익 (Net Income)': fin_df['Net Income']
-						})
-						st.bar_chart(chart_data)
-					else:
-						st.info("이 종목은 상세 매출/이익 차트를 제공하지 않습니다.")
-				else:
-					st.info("재무제표 데이터가 없습니다. (ETF나 상장 폐지 종목일 수 있습니다.)")
-
-			except Exception as e:
-				st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
-
-	st.divider()
-
-	st.subheader("🔮 기업의 '진짜 가치' 찾기 (DCF 모델)")
-	with st.expander("워렌 버핏처럼 기업의 적정 주가를 직접 계산해 보세요!", expanded=True):
-		st.write("회사가 미래에 벌어들일 잉여현금흐름(FCF)을 추정하여 현재 가치로 할인하는 절대 가치 평가 모델입니다.")
-		try:
-			recent_fcf = 0
-			if not cashflow.empty and 'Free Cash Flow' in cashflow.index:
-				recent_fcf = cashflow.loc['Free Cash Flow'].iloc[0]
-			
-			shares_out = fund_info.get('sharesOutstanding', 0)
-			total_cash = fund_info.get('totalCash', 0)
-			total_debt = fund_info.get('totalDebt', 0)
-			
-			if pd.isna(recent_fcf): recent_fcf = 0
-			
-			# --- ✨ 2단계: 과거 장부를 털어서 '평균 매출 성장률' AI 자동 계산 ---
-			auto_growth_rate = 15.0 # 계산 실패 시 쓸 기본값
-			try:
-				if not financials.empty and 'Total Revenue' in financials.index:
-					rev_data = financials.loc['Total Revenue'].dropna()
-					if len(rev_data) >= 2: # 최소 2년 치 데이터가 있어야 비교 가능
-						latest_rev = rev_data.iloc[0] # 가장 최근 매출
-						oldest_rev = rev_data.iloc[-1] # 가장 옛날 매출 (보통 3~4년 전)
-						years = len(rev_data) - 1
+					margin = fund_info.get('profitMargins', 0) * 100 if fund_info.get('profitMargins') else 0
+					if margin == 0 and not financials.empty:
+						try: margin = (financials.loc['Net Income'].iloc[0] / financials.loc['Total Revenue'].iloc[0]) * 100
+						except: pass
 						
-						if oldest_rev > 0 and latest_rev > 0:
-							# 연평균 복리 성장률(CAGR) 수학 공식 적용!
-							cagr = ((latest_rev / oldest_rev) ** (1 / years) - 1) * 100
-							# 슬라이더가 고장 나지 않게 상한선(50%)과 하한선(-10%) 안전장치 걸기
-							auto_growth_rate = max(-10.0, min(cagr, 50.0))
-			except:
-				pass
-			# -------------------------------------------------------------
-
-			st.info(f"💡 과거 재무제표를 분석한 결과, 이 기업의 최근 연평균 매출 성장률은 **{auto_growth_rate:.1f}%**입니다. (슬라이더에 자동 세팅되었습니다!)")
-			
-			dcf_col1, dcf_col2 = st.columns(2)
-			
-			with dcf_col1:
-				st.markdown("🏢 **[1단계] 현재 기초 체력 (자동 입력됨)**")
-				input_fcf = st.number_input("최근 1년 잉여현금흐름 (FCF)", value=float(recent_fcf), step=1000000.0, format="%f")
-				input_shares = st.number_input("발행 주식수", value=float(shares_out), step=1000000.0, format="%f")
-				input_cash = st.number_input("보유 현금", value=float(total_cash), step=1000000.0, format="%f")
-				input_debt = st.number_input("총 부채", value=float(total_debt), step=1000000.0, format="%f")
-				
-			with dcf_col2:
-				st.markdown("📈 **[2단계] 미래 성장률 & 할인율 가정**")
-				# 계산된 성장률을 1~5년 슬라이더 기본값으로 쏙!
-				growth_1_5 = st.slider("향후 1~5년 예상 성장률 (%)", -10.0, 50.0, float(round(auto_growth_rate, 1)), 1.0)
-				# 6~10년은 보통 기세가 꺾이므로 '절반(50%)' 정도로 보수적으로 세팅!
-				growth_6_10 = st.slider("향후 6~10년 예상 성장률 (%)", -10.0, 30.0, float(round(max(-10.0, auto_growth_rate * 0.5), 1)), 1.0)
-				
-				# 👇 날아갔던 할인율 & 영구 성장률 슬라이더 부활!
-				discount_rate = st.slider("할인율 (WACC, 요구수익률) (%)", 5.0, 20.0, 10.0, 0.5)
-				terminal_growth = st.slider("영구 성장률 (10년 이후) (%)", 0.0, 5.0, 2.5, 0.1)
-
-			if st.button("📊 이 조건으로 적정 주가 계산하기", type="primary", use_container_width=True):
-				if input_fcf <= 0 or input_shares <= 0:
-					st.warning("FCF(잉여현금흐름)와 발행 주식수는 0보다 커야 정상적인 계산이 가능합니다.")
-				elif discount_rate <= terminal_growth:
-					st.warning("수학적 오류! 할인율은 영구 성장률보다 커야 합니다.")
-				else:
-					with st.spinner("미래의 현금흐름을 현재 가치로 끌어오는 중... ⏳"):
-						future_fcfs = []
-						current_proj_fcf = input_fcf
-						for year in range(1, 11):
-							if year <= 5: current_proj_fcf *= (1 + (growth_1_5 / 100))
-							else: current_proj_fcf *= (1 + (growth_6_10 / 100))
-							discounted_fcf = current_proj_fcf / ((1 + (discount_rate / 100)) ** year)
-							future_fcfs.append(discounted_fcf)
-							
-						sum_discounted_fcf = sum(future_fcfs)
-						terminal_value = (current_proj_fcf * (1 + (terminal_growth / 100))) / ((discount_rate / 100) - (terminal_growth / 100))
-						discounted_tv = terminal_value / ((1 + (discount_rate / 100)) ** 10)
-						enterprise_value = sum_discounted_fcf + discounted_tv
-						equity_value = enterprise_value + input_cash - input_debt
-						intrinsic_value = equity_value / input_shares
-						margin_of_safety = ((intrinsic_value - current_price) / current_price) * 100 if current_price > 0 else 0
-							
-						st.success("계산 완료! 시장이 평가하는 가격과 데이터가 말하는 진짜 가치를 비교해 보세요.")
-						res_c1, res_c2, res_c3 = st.columns(3)
-						res_c1.metric("현재 시장 주가", fmt_price(current_price))
+					roe = fund_info.get('returnOnEquity', 0) * 100 if fund_info.get('returnOnEquity') else 0
+					if roe == 0:
+						try: roe = (financials.loc['Net Income'].iloc[0] / balance_sheet.loc['Stockholders Equity'].iloc[0]) * 100
+						except: pass
 						
-						if intrinsic_value > 0:
-							res_c2.metric("내가 계산한 적정 주가", fmt_price(intrinsic_value))
-							if margin_of_safety > 0:
-								res_c3.metric("안전 마진 (저평가율)", f"+{margin_of_safety:.1f}%", "저평가 (매수 찬스!)")
-								st.info(f"💡 현재 주가보다 적정 가치가 **{margin_of_safety:.1f}%** 더 높습니다! 바겐세일 상태일 수 있습니다.")
-							else:
-								res_c3.metric("안전 마진 (고평가율)", f"{margin_of_safety:.1f}%", "고평가 (거품 주의)")
-								st.warning(f"⚠️ 현재 주가가 적정 가치보다 비쌉니다. 거품이 끼어있을 수 있으니 주의하세요!")
+					debt_to_eq = fund_info.get('debtToEquity', 0) if fund_info.get('debtToEquity') else 0
+					if debt_to_eq == 0:
+						try: debt_to_eq = (balance_sheet.loc['Total Debt'].iloc[0] / balance_sheet.loc['Stockholders Equity'].iloc[0]) * 100
+						except: pass
+						
+					op_cashflow = fund_info.get('operatingCashflow', 0) if fund_info.get('operatingCashflow') else 0
+					if op_cashflow == 0:
+						try: op_cashflow = cashflow.loc['Operating Cash Flow'].iloc[0]
+						except: pass
+
+					st.write("💡 **핵심 펀더멘털 지표**")
+					f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+					
+					if margin >= 20:
+						f_col1.success(f"순이익률\n\n**{margin:.1f}%** (마진 끝판왕 👑)")
+					elif margin > 0:
+						f_col1.metric("순이익률 (마진)", f"{margin:.1f}%")
+					else:
+						f_col1.error(f"순이익률\n\n**{margin:.1f}%** (적자 상태 🚨)")
+						
+					f_col2.metric("자기자본이익률 (ROE)", f"{roe:.1f}%" if roe != 0 else "N/A")
+					f_col3.metric("부채비율 (빚)", f"{debt_to_eq:.1f}%" if debt_to_eq != 0 else "N/A")
+					
+					if op_cashflow != 0:
+						if "KS" in ticker_symbol or "KQ" in ticker_symbol:
+							cf_str = f"{op_cashflow / 100000000:,.0f}억 원"
 						else:
-							st.error("계산된 적정 주가가 마이너스입니다.")
-		except Exception as e:
-			st.error(f"DCF 데이터를 준비하는 중 오류가 발생했습니다: {e}")
-            
-	st.divider()
+							cf_str = f"${op_cashflow / 1000000:,.0f}M"
+					else:
+						cf_str = "N/A"
+					f_col4.metric("영업활동 현금흐름", cf_str)
 
-	st.subheader("🏭 산업(Sector) 맞춤형 심층 분석")
-	with st.expander("📖 R&D, ROA, 마진율... 이 산업에서는 어떤 숫자가 좋은 건가요?", expanded=False):
-		st.info("""
-		* 🔬 **R&D (연구개발) 투자 비율:** 주로 빅테크나 제약/바이오에서 생명줄입니다. 번 돈의 **10~20% 이상 꾸준히 투자**한다면 미래가 밝은 기업 (🟢 **매수 긍정**).
-		* 🏦 **총자산이익률 (ROA):** 주로 은행/금융주를 평가할 때 봅니다. 은행은 ROA가 **1~1.5%만 넘어도 돈을 기가 막히게 잘 굴리는 훌륭한 은행**입니다 (🟢 **매수 긍정**).
-		* 🍔 **영업이익률 (Operating Margin):** 소비재, 제조업의 핵심이자 **삼성전자/애플 같은 하드웨어 테크 기업에게도 제일 중요한 지표**입니다! 재료비, 인건비 다 떼고 남긴 돈으로, **제조업은 10% 이상, 소프트웨어는 20~30% 이상**이면 훌륭합니다. (🔴 떨어지면 **매도 강력 주의**).
-		* 💰 **매출 총이익률 (Gross Margin):** 순수 '원가'만 뺀 비율이에요. **50% 이상으로 아주 높다면**, 독점적 브랜드 파워를 가졌다는 뜻입니다 (🟢 **강력 매수**).
-		* 📈 **매출 성장률 (YoY):** 작년 대비 회사의 덩치가 얼마나 커졌는지 보여줍니다. **꾸준히 두 자릿수(+10% 이상) 성장**해야 좋습니다.
-		""")
+					st.divider()
 
-	with st.expander(f"'{short_name}'이(가) 속한 산업의 핵심 지표 파헤치기", expanded=False):
-		sector = fund_info.get('sector', '알 수 없음')
-		industry = fund_info.get('industry', '알 수 없음')
-		st.write(f"🏷️ **섹터:** {sector} | **세부 산업:** {industry}")
-		
-		try:
-			gross_margins = fund_info.get('grossMargins', 0) * 100 if fund_info.get('grossMargins') else 0
-			operating_margins = fund_info.get('operatingMargins', 0) * 100 if fund_info.get('operatingMargins') else 0
-			revenue_growth = fund_info.get('revenueGrowth', 0) * 100 if fund_info.get('revenueGrowth') else 0
-			
-			rnd_expense = 0
-			if not financials.empty and 'Research And Development' in financials.index:
-				rnd_expense = financials.loc['Research And Development'].iloc[0]
-				total_rev = financials.loc['Total Revenue'].iloc[0]
-				rnd_ratio = (rnd_expense / total_rev) * 100 if total_rev > 0 else 0
-			else:
-				rnd_ratio = 0
+					st.write("📈 **최근 4년 매출액 vs 당기순이익 성적표** (우상향하는 기업이 최고!)")
+					st.caption("💡 주린이 꿀팁: 막대그래프 두 개(매출=회사의 덩치, 당기순이익=진짜 남긴 돈)가 매년 계단처럼 같이 **우상향**하고 있다면 장투하기 아주 좋은 우량주입니다!")
+					if not financials.empty:
+						fin_df = financials.T.head(4)[::-1]
+						if 'Total Revenue' in fin_df.columns and 'Net Income' in fin_df.columns:
+							chart_data = pd.DataFrame({
+								'매출액 (Revenue)': fin_df['Total Revenue'],
+								'당기순이익 (Net Income)': fin_df['Net Income']
+							})
+							st.bar_chart(chart_data)
+						else:
+							st.info("이 종목은 상세 매출/이익 차트를 제공하지 않습니다.")
+					else:
+						st.info("재무제표 데이터가 없습니다. (ETF나 상장 폐지 종목일 수 있습니다.)")
+
+				except Exception as e:
+					st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
+
+		st.divider()
+
+		st.subheader("🔮 기업의 '진짜 가치' 찾기 (DCF 모델)")
+		with st.expander("워렌 버핏처럼 기업의 적정 주가를 직접 계산해 보세요!", expanded=True):
+			st.write("회사가 미래에 벌어들일 잉여현금흐름(FCF)을 추정하여 현재 가치로 할인하는 절대 가치 평가 모델입니다.")
+			try:
+				recent_fcf = 0
+				if not cashflow.empty and 'Free Cash Flow' in cashflow.index:
+					recent_fcf = cashflow.loc['Free Cash Flow'].iloc[0]
 				
-			# ✨ 카멜레온 로직 업그레이드: 기술주는 4칸으로 쪼개서 영업이익률까지 싹 다 보여주기!
-			if sector == 'Technology' or sector == 'Healthcare':
-				st.info("💡 **기술(Tech) 및 헬스케어 산업**은 미래를 위한 **'연구개발(R&D)'**과 당장의 **'영업이익률'**을 동시에 봐야 합니다!")
-				s_col1, s_col2, s_col3, s_col4 = st.columns(4) # 👈 4칸으로 확장!
-				s_col1.metric("R&D 투자 비율", f"{rnd_ratio:.1f}%" if rnd_ratio > 0 else "데이터 없음")
-				s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
-				s_col3.metric("매출 총이익률", f"{gross_margins:.1f}%")
-				s_col4.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-			elif sector == 'Financial Services':
-				st.info("💡 **금융 산업**은 PER보다 **'자산(ROA) 대비 수익성'**과 **'영업이익률'**이 중요합니다!")
-				roa = fund_info.get('returnOnAssets', 0) * 100 if fund_info.get('returnOnAssets') else 0
-				s_col1, s_col2, s_col3 = st.columns(3)
-				s_col1.metric("총자산이익률 (ROA)", f"{roa:.2f}%")
-				s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
-				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-			elif sector == 'Consumer Cyclical' or sector == 'Consumer Defensive' or sector == 'Industrials':
-				st.info("💡 **소비재 및 산업재(제조업)**는 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
-				s_col1, s_col2, s_col3 = st.columns(3)
-				s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
-				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
-				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-			else:
-				st.info("💡 이 산업의 기본적인 수익성과 성장성을 확인해 보세요.")
-				s_col1, s_col2, s_col3 = st.columns(3)
-				s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
-				s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
-				s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
-		except Exception as e:
-			st.warning(f"산업 세부 지표를 불러오는 데 실패했습니다: {e}")
+				shares_out = fund_info.get('sharesOutstanding', 0)
+				total_cash = fund_info.get('totalCash', 0)
+				total_debt = fund_info.get('totalDebt', 0)
+				if pd.isna(recent_fcf): recent_fcf = 0
+				
+				auto_growth_rate = 15.0
+				try:
+					if not financials.empty and 'Total Revenue' in financials.index:
+						rev_data = financials.loc['Total Revenue'].dropna()
+						if len(rev_data) >= 2:
+							latest_rev = rev_data.iloc[0]
+							oldest_rev = rev_data.iloc[-1]
+							years = len(rev_data) - 1
+							if oldest_rev > 0 and latest_rev > 0:
+								cagr = ((latest_rev / oldest_rev) ** (1 / years) - 1) * 100
+								auto_growth_rate = max(-10.0, min(cagr, 50.0))
+				except:
+					pass
+
+				st.info(f"💡 과거 재무제표를 분석한 결과, 이 기업의 최근 연평균 매출 성장률은 **{auto_growth_rate:.1f}%**입니다. (슬라이더에 자동 세팅되었습니다!)")
+				
+				dcf_col1, dcf_col2 = st.columns(2)
+				
+				with dcf_col1:
+					st.markdown("🏢 **[1단계] 현재 기초 체력 (자동 입력됨)**")
+					input_fcf = st.number_input("최근 1년 잉여현금흐름 (FCF)", value=float(recent_fcf), step=1000000.0, format="%f")
+					input_shares = st.number_input("발행 주식수", value=float(shares_out), step=1000000.0, format="%f")
+					input_cash = st.number_input("보유 현금", value=float(total_cash), step=1000000.0, format="%f")
+					input_debt = st.number_input("총 부채", value=float(total_debt), step=1000000.0, format="%f")
+					
+				with dcf_col2:
+					st.markdown("📈 **[2단계] 미래 성장률 & 할인율 가정**")
+					growth_1_5 = st.slider("향후 1~5년 예상 성장률 (%)", -10.0, 50.0, float(round(auto_growth_rate, 1)), 1.0)
+					growth_6_10 = st.slider("향후 6~10년 예상 성장률 (%)", -10.0, 30.0, float(round(max(-10.0, auto_growth_rate * 0.5), 1)), 1.0)
+					discount_rate = st.slider("할인율 (WACC, 요구수익률) (%)", 5.0, 20.0, 10.0, 0.5)
+					terminal_growth = st.slider("영구 성장률 (10년 이후) (%)", 0.0, 5.0, 2.5, 0.1)
+					
+				if st.button("📊 이 조건으로 적정 주가 계산하기", type="primary", use_container_width=True):
+					if input_fcf <= 0 or input_shares <= 0:
+						st.warning("FCF(잉여현금흐름)와 발행 주식수는 0보다 커야 정상적인 계산이 가능합니다.")
+					elif discount_rate <= terminal_growth:
+						st.warning("수학적 오류! 할인율은 영구 성장률보다 커야 합니다.")
+					else:
+						with st.spinner("미래의 현금흐름을 현재 가치로 끌어오는 중... ⏳"):
+							future_fcfs = []
+							current_proj_fcf = input_fcf
+							for year in range(1, 11):
+								if year <= 5: current_proj_fcf *= (1 + (growth_1_5 / 100))
+								else: current_proj_fcf *= (1 + (growth_6_10 / 100))
+								discounted_fcf = current_proj_fcf / ((1 + (discount_rate / 100)) ** year)
+								future_fcfs.append(discounted_fcf)
+								
+							sum_discounted_fcf = sum(future_fcfs)
+							terminal_value = (current_proj_fcf * (1 + (terminal_growth / 100))) / ((discount_rate / 100) - (terminal_growth / 100))
+							discounted_tv = terminal_value / ((1 + (discount_rate / 100)) ** 10)
+							enterprise_value = sum_discounted_fcf + discounted_tv
+							equity_value = enterprise_value + input_cash - input_debt
+							intrinsic_value = equity_value / input_shares
+							margin_of_safety = ((intrinsic_value - current_price) / current_price) * 100 if current_price > 0 else 0
+								
+							st.success("계산 완료! 시장이 평가하는 가격과 데이터가 말하는 진짜 가치를 비교해 보세요.")
+							res_c1, res_c2, res_c3 = st.columns(3)
+							res_c1.metric("현재 시장 주가", fmt_price(current_price))
+							
+							if intrinsic_value > 0:
+								res_c2.metric("내가 계산한 적정 주가", fmt_price(intrinsic_value))
+								if margin_of_safety > 0:
+									res_c3.metric("안전 마진 (저평가율)", f"+{margin_of_safety:.1f}%", "저평가 (매수 찬스!)")
+									st.info(f"💡 현재 주가보다 적정 가치가 **{margin_of_safety:.1f}%** 더 높습니다! 바겐세일 상태일 수 있습니다.")
+								else:
+									res_c3.metric("안전 마진 (고평가율)", f"{margin_of_safety:.1f}%", "고평가 (거품 주의)")
+									st.warning(f"⚠️ 현재 주가가 적정 가치보다 비쌉니다. 거품이 끼어있을 수 있으니 주의하세요!")
+							else:
+								st.error("계산된 적정 주가가 마이너스입니다.")
+			except Exception as e:
+				st.error(f"DCF 데이터를 준비하는 중 오류가 발생했습니다: {e}")
+
+		st.divider()
+
+		st.subheader("🏭 산업(Sector) 맞춤형 심층 분석")
+		with st.expander("📖 R&D, ROA, 마진율... 이 산업에서는 어떤 숫자가 좋은 건가요?", expanded=False):
+			st.info("""
+			* 🔬 **R&D (연구개발) 투자 비율:** 주로 빅테크나 제약/바이오에서 생명줄입니다. 번 돈의 **10~20% 이상 꾸준히 투자**한다면 미래가 밝은 기업 (🟢 **매수 긍정**).
+			* 🏦 **총자산이익률 (ROA):** 주로 은행/금융주를 평가할 때 봅니다. 은행은 ROA가 **1~1.5%만 넘어도 돈을 기가 막히게 잘 굴리는 훌륭한 은행**입니다 (🟢 **매수 긍정**).
+			* 🍔 **영업이익률 (Operating Margin):** 소비재, 제조업의 핵심이자 **삼성전자/애플 같은 하드웨어 테크 기업에게도 제일 중요한 지표**입니다! 재료비, 인건비 다 떼고 남긴 돈으로, **제조업은 10% 이상, 소프트웨어는 20~30% 이상**이면 훌륭합니다. (🔴 떨어지면 **매도 강력 주의**).
+			* 💰 **매출 총이익률 (Gross Margin):** 순수 '원가'만 뺀 비율이에요. **50% 이상으로 아주 높다면**, 독점적 브랜드 파워를 가졌다는 뜻입니다 (🟢 **강력 매수**).
+			* 📈 **매출 성장률 (YoY):** 작년 대비 회사의 덩치가 얼마나 커졌는지 보여줍니다. **꾸준히 두 자릿수(+10% 이상) 성장**해야 좋습니다.
+			""")
+
+		with st.expander(f"'{short_name}'이(가) 속한 산업의 핵심 지표 파헤치기", expanded=False):
+			sector = fund_info.get('sector', '알 수 없음')
+			industry = fund_info.get('industry', '알 수 없음')
+			st.write(f"🏷️ **섹터:** {sector} | **세부 산업:** {industry}")
+			
+			try:
+				gross_margins = fund_info.get('grossMargins', 0) * 100 if fund_info.get('grossMargins') else 0
+				operating_margins = fund_info.get('operatingMargins', 0) * 100 if fund_info.get('operatingMargins') else 0
+				revenue_growth = fund_info.get('revenueGrowth', 0) * 100 if fund_info.get('revenueGrowth') else 0
+				
+				rnd_expense = 0
+				if not financials.empty and 'Research And Development' in financials.index:
+					rnd_expense = financials.loc['Research And Development'].iloc[0]
+					total_rev = financials.loc['Total Revenue'].iloc[0]
+					rnd_ratio = (rnd_expense / total_rev) * 100 if total_rev > 0 else 0
+				else:
+					rnd_ratio = 0
+					
+				if sector == 'Technology' or sector == 'Healthcare':
+					st.info("💡 **기술(Tech) 및 헬스케어 산업**은 미래를 위한 **'연구개발(R&D)'**과 당장의 **'영업이익률'**을 동시에 봐야 합니다!")
+					s_col1, s_col2, s_col3, s_col4 = st.columns(4)
+					s_col1.metric("R&D 투자 비율", f"{rnd_ratio:.1f}%" if rnd_ratio > 0 else "데이터 없음")
+					s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
+					s_col3.metric("매출 총이익률", f"{gross_margins:.1f}%")
+					s_col4.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				elif sector == 'Financial Services':
+					st.info("💡 **금융 산업**은 PER보다 **'자산(ROA) 대비 수익성'**과 **'영업이익률'**이 중요합니다!")
+					roa = fund_info.get('returnOnAssets', 0) * 100 if fund_info.get('returnOnAssets') else 0
+					s_col1, s_col2, s_col3 = st.columns(3)
+					s_col1.metric("총자산이익률 (ROA)", f"{roa:.2f}%")
+					s_col2.metric("영업이익률", f"{operating_margins:.1f}%")
+					s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				elif sector == 'Consumer Cyclical' or sector == 'Consumer Defensive' or sector == 'Industrials':
+					st.info("💡 **소비재 및 산업재(제조업)**는 원가를 떼고 남기는 **'영업이익률'**과 흔들리지 않는 **'매출 성장'**이 핵심입니다!")
+					s_col1, s_col2, s_col3 = st.columns(3)
+					s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
+					s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
+					s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+				else:
+					st.info("💡 이 산업의 기본적인 수익성과 성장성을 확인해 보세요.")
+					s_col1, s_col2, s_col3 = st.columns(3)
+					s_col1.metric("영업이익률", f"{operating_margins:.1f}%")
+					s_col2.metric("매출 총이익률", f"{gross_margins:.1f}%")
+					s_col3.metric("매출 성장률 (YoY)", f"{revenue_growth:.1f}%")
+			except Exception as e:
+				st.warning(f"산업 세부 지표를 불러오는 데 실패했습니다: {e}")
 
 	# --- 공통 지표 연산 (앱 전체에서 사용) ---
 	df['20일_이동평균'] = df['Close'].rolling(window=20).mean()
