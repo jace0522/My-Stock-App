@@ -473,6 +473,83 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 
 st.divider()
 
+# --- ✨ 신규 기능: 노벨상 수상 알고리즘! 포트폴리오 최적화 ---
+st.subheader("⚖️ AI 포트폴리오 비중 최적화 (마코위츠 모델)")
+with st.expander("내 계좌의 주식들을 어떤 비율로 섞어야 가장 안전하고 수익이 높을까?", expanded=False):
+	my_tickers = list(st.session_state['account']['holdings'].keys())
+	if len(my_tickers) < 2:
+		st.info("💡 최적화를 하려면 모의투자 계좌에 최소 2개 이상의 종목이 있어야 합니다! (계란을 한 바구니에 담지 마세요!)")
+	else:
+		if st.button("🧠 내 포트폴리오 황금 비율 찾기 (최적화 시작)", use_container_width=True):
+			with st.spinner("수천 개의 비율 조합을 시뮬레이션하여 가장 효율적인 전선(Efficient Frontier)을 찾는 중입니다... ⏳"):
+				try:
+					# 1. 내 보유 종목들의 과거 2년치 데이터 가져오기
+					data = yf.download(my_tickers, period="2y")['Close']
+					
+					# 2. 일일 수익률, 연평균 기대 수익률, 공분산(종목 간의 상관관계) 계산
+					returns = data.pct_change().dropna()
+					mean_returns = returns.mean() * 252
+					cov_matrix = returns.cov() * 252
+
+					# 3. 3000번의 평행우주(랜덤 비중) 생성
+					num_portfolios = 3000
+					results = np.zeros((3, num_portfolios))
+					weights_record = []
+
+					for i in range(num_portfolios):
+						weights = np.random.random(len(my_tickers))
+						weights /= np.sum(weights) # 비중의 합을 100%로 맞춤
+						weights_record.append(weights)
+						
+						port_return = np.sum(mean_returns * weights)
+						port_std = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+						
+						results[0,i] = port_std # 리스크 (변동성)
+						results[1,i] = port_return # 기대 수익률
+						# 샤프 지수 (위험 대비 수익률, 무위험 이자율 2% 가정)
+						results[2,i] = (port_return - 0.02) / port_std if port_std > 0 else 0
+
+					# 4. 가장 샤프 지수가 높은 '최적의 포트폴리오' 추출
+					max_sharpe_idx = np.argmax(results[2])
+					optimal_std = results[0, max_sharpe_idx]
+					optimal_ret = results[1, max_sharpe_idx]
+					optimal_weights = weights_record[max_sharpe_idx]
+
+					st.success("찾았습니다! 리스크를 최소화하고 수익을 극대화하는 황금 비율입니다. 🏆")
+					
+					# 5. 멋진 차트로 결과 보여주기
+					opt_c1, opt_c2 = st.columns([1, 1])
+					
+					with opt_c1:
+						st.write("**🏆 AI 추천 종목 비중 (원형 차트)**")
+						fig_pie = go.Figure(data=[go.Pie(labels=my_tickers, values=optimal_weights, hole=.4, textinfo='label+percent')])
+						fig_pie.update_layout(template="plotly_dark", height=350, margin=dict(l=20, r=20, t=30, b=20))
+						st.plotly_chart(fig_pie, use_container_width=True)
+						
+					with opt_c2:
+						st.write("**📊 효율적 전선 (Efficient Frontier)**")
+						fig_scatter = go.Figure()
+						# 3000개의 랜덤 포트폴리오 구름
+						fig_scatter.add_trace(go.Scatter(
+							x=results[0], y=results[1], mode='markers',
+							marker=dict(color=results[2], colorscale='Viridis', showscale=True, size=5, colorbar=dict(title="샤프지수")),
+							name='시뮬레이션 포트폴리오'
+						))
+						# 최적의 포트폴리오 붉은 별표!
+						fig_scatter.add_trace(go.Scatter(
+							x=[optimal_std], y=[optimal_ret], mode='markers',
+							marker=dict(color='red', size=18, symbol='star', line=dict(color='white', width=1)),
+							name='🌟 최적의 황금 비율'
+						))
+						fig_scatter.update_layout(xaxis_title="위험 (리스크/변동성)", yaxis_title="기대 수익률", template="plotly_dark", height=350, margin=dict(l=20, r=20, t=30, b=20))
+						st.plotly_chart(fig_scatter, use_container_width=True)
+
+					st.info(f"💡 이 황금 비율대로 투자할 경우, 과거 2년 데이터 기준 **예상 연수익률은 {optimal_ret*100:.1f}%**, **예상 리스크(변동성)는 {optimal_std*100:.1f}%** 로 계산됩니다.")
+				except Exception as e:
+					st.error(f"최적화 계산 중 오류가 발생했습니다. (보유 종목의 상장 기간이 너무 짧거나 데이터가 부족할 수 있습니다.) 에러: {e}")
+
+st.divider()
+
 # --- ✨ 신규 기능: 나만의 퀀트 스크리너 ---
 st.subheader("🔎 나만의 퀀트 종목 발굴기 (미니 스크리너)")
 with st.expander("조건에 맞는 보석 같은 주식을 찾아보세요! (Top 우량주 & 내 관심종목 대상)", expanded=False):
