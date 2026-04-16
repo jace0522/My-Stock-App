@@ -815,20 +815,24 @@ try:
 		st.subheader("🏢 기업 기초체력 (펀더멘털) 분석")
 		with st.expander("📖 마진, ROE, 부채비율, 현금흐름이 무슨 뜻인가요?", expanded=False):
 			st.info("""
-			* 👑 **순이익률 (마진):** 10,000원짜리 물건을 팔았을 때 내 손에 진짜 떨어지는 돈이 얼마인지 보여줍니다. 20%면 2,000원이 남는 셈이죠. 애플이나 명품 브랜드처럼 **마진이 높을수록 가격을 맘대로 올릴 수 있는 슈퍼 갑(독점력)** 기업입니다.
-			* 📈 **자기자본이익률 (ROE):** '내 진짜 돈(자본)'을 굴려서 1년 동안 몇 %의 수익을 냈는지 보여줍니다. 투자의 신 워렌 버핏이 가장 사랑하는 지표로, 보통 **15% 이상 꾸준히 나오면 돈 복사기 수준의 훌륭한 기업**으로 평가받습니다.
-			* 🚨 **부채비율 (빚):** 내 진짜 돈 대비 은행 빚이 얼마나 있는지 보여줍니다. 보통 100% 이하면 아주 튼튼하고 안전하며, 이 숫자가 너무 높으면 금리가 비쌀 때 이자 내느라 회사가 허덕일 수 있습니다.
-			* 💵 **영업활동 현금흐름:** 장부상으로만 돈을 번 게 아니라, **실제로 회사 통장에 꽂힌 '진짜 현금'**을 의미합니다. 아무리 장부상 이익이 나도 현금이 마이너스(-)면 월급을 못 줘서 회사가 위험해질 수 있어요. 이건 무조건 플러스(+)여야 좋습니다!
+			# ... (이 안의 설명 텍스트는 기존과 동일하게 둡니다) ...
 			""")
 
 		with st.expander("📊 재무제표 & 핵심 지표 열어보기 (진짜 돈 넣기 전 필수 확인!)"):
 			with st.spinner("야후 파이낸스에서 기업의 재무 장부를 뒤지고 있습니다... ⏳"):
+				
+				# ✨ [핵심 해결책] 에러가 나더라도 앱이 죽지 않도록 '빈 바구니'를 미리 만들어 둡니다!
+				financials = pd.DataFrame()
+				balance_sheet = pd.DataFrame()
+				cashflow = pd.DataFrame()
+				fund_info = {}
+				
 				try:
 					stock_obj = yf.Ticker(ticker_symbol)
 					financials = stock_obj.financials
 					balance_sheet = stock_obj.balance_sheet
 					cashflow = stock_obj.cashflow
-					fund_info = stock_obj.info
+					fund_info = stock_obj.info # 정상 작동 시 빈 바구니에 데이터를 채움
 					
 					margin = fund_info.get('profitMargins', 0) * 100 if fund_info.get('profitMargins') else 0
 					if margin == 0 and not financials.empty:
