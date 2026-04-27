@@ -1292,14 +1292,12 @@ try:
 	st.divider()
 
 	# ====================================================================
-	# ✨ 신규 기능: AI 이벤트 추적 인터랙티브 차트 (진짜 과거 뉴스 연동!)
+	# ✨ 신규 기능: AI 이벤트 추적 인터랙티브 차트 (가짜 데이터 원천 차단!)
 	# ====================================================================
 	st.subheader("🚀 주가 폭등/폭락 원인 추적 (AI 뉴스 요약 차트)")
-	with st.expander("별표(⭐) 위에 마우스를 올려서 진짜 주가 변동 이유를 확인하세요!", expanded=True):
+	with st.expander("별표(⭐) 위에 마우스를 올려서 실제 주가 변동 이유를 확인하세요!", expanded=True):
 		try:
-			# 제미나이 AI 모델 불러오기 (이미 상단에 설정되어 있다고 가정)
-			import google.generativeai as genai
-			ai_analyst = genai.GenerativeModel('gemini-3-flash')
+			import time # API 과부하 방지용
 
 			df_event = df.tail(252).copy() 
 			df_event['Change'] = df_event['수익률'] * 100
@@ -1307,55 +1305,61 @@ try:
 			# 5% 이상 크게 움직인 날짜들 먼저 고르기
 			significant_events = df_event[abs(df_event['Change']) > 5].copy()
 			
-			# 🚨 기본값(가짜 정보)으로 일단 채워두기
-			significant_events['Event_Text'] = significant_events['Change'].apply(
-				lambda x: f"<b>변동률: {x:.1f}%</b><br>세부 뉴스 분석을 생략한 날짜입니다."
-			)
+			# 🚨 가짜 데이터 다 지우고 빈칸으로 시작!
+			significant_events['Event_Text'] = ""
 
 			if not significant_events.empty:
-				with st.spinner(f"🕵️‍♂️ AI가 {ticker_symbol}의 과거 찐 뉴스를 뒤져오고 있습니다... (약 5~10초 소요) ⏳"):
-					# 🔥 [핵심 로직] 가장 심하게 폭등/폭락한 상위 5개 날짜만 뽑기 (로딩 속도 방어)
+				with st.spinner(f"🕵️‍♂️ AI가 {ticker_symbol}의 과거 실제 뉴스를 검색 중입니다... (API 과부하 방지를 위해 5~10초 소요) ⏳"):
+					# 가장 심하게 폭등/폭락한 상위 5개 날짜만 뽑기
 					top_5_dates = significant_events['Change'].abs().nlargest(5).index
 					
 					for date in top_5_dates:
 						date_str = date.strftime('%Y-%m-%d')
 						change_val = significant_events.loc[date, 'Change']
 						
-						# 제미나이에게 그날 무슨 일이 있었는지 묻기
-						prompt = f"미국 주식 {ticker_symbol}이(가) {date_str}에 주가가 약 {change_val:.1f}% 변동했어. 이 날짜 근처에 발생한 실제 뉴스, 실적발표, 또는 거시경제 이슈 등 진짜 변동 원인을 한국어로 딱 1문장(50자 이내)으로 요약해 줘."
+						# 추측을 배제하고 팩트만 요구하는 프롬프트
+						prompt = f"미국 주식 {ticker_symbol}이(가) {date_str}에 주가가 약 {change_val:.1f}% 변동했습니다. 이 날짜 근처의 실제 경제 뉴스, 실적발표 등 명확한 사실(Fact)에 기반한 변동 원인을 한국어로 딱 1문장(50자 이내)으로 요약하세요. 추측성 내용은 절대 포함하지 마세요."
 						
 						try:
-							response = ai_analyst.generate_content(prompt)
+							# 상단에서 정의한 글로벌 'model' 변수를 그대로 사용
+							response = model.generate_content(prompt)
 							real_news = response.text.replace('\n', ' ').strip()
 							
-							# HTML 텍스트로 예쁘게 꾸며서 덮어쓰기!
 							color_tag = "#00FF88" if change_val > 0 else "#FF4B4B"
 							sign = "폭등" if change_val > 0 else "폭락"
-							significant_events.loc[date, 'Event_Text'] = f"<b style='color:{color_tag};'>{sign}! ({change_val:.1f}%)</b><br>📰 <b>실제 이유:</b> {real_news}"
-						except:
-							pass # 혹시 AI가 에러를 내면 그냥 넘어감
+							significant_events.loc[date, 'Event_Text'] = f"<b style='color:{color_tag};'>{sign}! ({change_val:.1f}%)</b><br>📰 <b>팩트 체크:</b> {real_news}"
+							
+							# API 연속 호출로 인한 Rate Limit(차단) 방지를 위해 1.5초 대기
+							time.sleep(1.5) 
+						except Exception as e:
+							# 에러가 나면 숨기지 않고 실패 사유를 그대로 노출
+							significant_events.loc[date, 'Event_Text'] = f"<b>({change_val:.1f}%)</b><br>⚠️ 실제 뉴스 로드 실패 (API 에러)"
 
-			# 차트 그리기 (기존과 동일)
+			# Event_Text가 성공적으로 채워진(AI가 진짜 뉴스를 가져온) 데이터만 남기기
+			valid_events = significant_events[significant_events['Event_Text'] != ""]
+
+			# 차트 그리기
 			fig_event = go.Figure()
 			fig_event.add_trace(go.Scatter(
 				x=df_event.index, y=df_event['Close'], 
 				mode='lines', name='주가 흐름', line=dict(color='rgba(255, 255, 255, 0.4)', width=2)
 			))
 			
-			fig_event.add_trace(go.Scatter(
-				x=significant_events.index, 
-				y=significant_events['Close'],
-				mode='markers',
-				marker=dict(
-					color=['#00FF88' if c > 0 else '#FF4B4B' for c in significant_events['Change']], 
-					size=[18 if i in top_5_dates else 10 for i in significant_events.index], # Top 5 날짜는 별 크기를 더 크게!
-					symbol='star',
-					line=dict(color='white', width=1)
-				),
-				name='주요 이벤트 (마우스 오버)',
-				text=significant_events['Event_Text'], 
-				hoverinfo='text' 
-			))
+			if not valid_events.empty:
+				fig_event.add_trace(go.Scatter(
+					x=valid_events.index, 
+					y=valid_events['Close'],
+					mode='markers',
+					marker=dict(
+						color=['#00FF88' if c > 0 else '#FF4B4B' for c in valid_events['Change']], 
+						size=18, 
+						symbol='star',
+						line=dict(color='white', width=1)
+					),
+					name='주요 이벤트 (마우스 오버)',
+					text=valid_events['Event_Text'], 
+					hoverinfo='text' 
+				))
 			
 			fig_event.update_layout(
 				template="plotly_dark", height=400, 
@@ -1364,10 +1368,10 @@ try:
 				yaxis_title="주가 (USD)"
 			)
 			st.plotly_chart(fig_event, use_container_width=True)
-			st.caption("💡 꿀팁: 가장 큰 별(⭐) 5개 위에 마우스를 올리면 AI가 분석한 진짜 과거 뉴스가 나타납니다.")
+			st.caption("💡 팩트 체크가 완료된 Top 5 핵심 변동일만 별표(⭐)로 표시됩니다.")
 			
 		except Exception as e:
-			st.warning(f"이벤트 차트를 그리는 중 오류가 발생했습니다: {e}")
+			st.error(f"이벤트 차트를 그리는 중 오류가 발생했습니다: {e}")
 
 	st.divider()
 	# ====================================================================
