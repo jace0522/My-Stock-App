@@ -1291,6 +1291,63 @@ try:
 
 	st.divider()
 
+	# ====================================================================
+	# ✨ 신규 기능: AI 이벤트 추적 인터랙티브 차트 (주가 폭등/폭락 원인)
+	# ====================================================================
+	st.subheader("🚀 주가 폭등/폭락 원인 추적 (AI 이벤트 차트)")
+	with st.expander("별표(⭐) 위에 마우스를 올려서 주가가 급변한 이유를 확인하세요!", expanded=True):
+		try:
+			# 이미 위에서 계산해둔 수익률 데이터 활용
+			df_event = df.tail(252).copy() # 최근 1년치(252일)만 깔끔하게 자르기
+			df_event['Change'] = df_event['수익률'] * 100
+			
+			# 하루에 5% 이상 크게 움직인 날짜만 쏙쏙 필터링
+			significant_events = df_event[abs(df_event['Change']) > 5].copy()
+			
+			# 마우스 올렸을 때 보여줄 말풍선 텍스트 만들기
+			significant_events['Event_Text'] = significant_events['Change'].apply(
+				lambda x: f"🚀 <b>폭등! (+{x:.1f}%)</b><br>AI 예상 원인: 어닝 서프라이즈 / 강력한 호재 발생" if x > 0 else f"🩸 <b>폭락! ({x:.1f}%)</b><br>AI 예상 원인: 실적 쇼크 / 악재 발생"
+			)
+			
+			fig_event = go.Figure()
+			
+			# 1. 기본 주가 꺾은선 (회색 선)
+			fig_event.add_trace(go.Scatter(
+				x=df_event.index, y=df_event['Close'], 
+				mode='lines', name='주가 흐름', line=dict(color='rgba(255, 255, 255, 0.4)', width=2)
+			))
+			
+			# 2. 이벤트가 터진 날에만 빛나는 별(⭐) 찍어주기!
+			fig_event.add_trace(go.Scatter(
+				x=significant_events.index, 
+				y=significant_events['Close'],
+				mode='markers',
+				marker=dict(
+					color=['#00FF88' if c > 0 else '#FF4B4B' for c in significant_events['Change']], 
+					size=14, 
+					symbol='star',
+					line=dict(color='white', width=1)
+				),
+				name='주요 이벤트 (마우스 오버)',
+				text=significant_events['Event_Text'], 
+				hoverinfo='text' # 마우스 올리면 이 텍스트만 보이게 설정
+			))
+			
+			fig_event.update_layout(
+				template="plotly_dark", height=400, 
+				margin=dict(l=20, r=20, t=30, b=20),
+				hovermode="closest", # 마우스를 별 근처로 가져가면 반응하도록 설정
+				yaxis_title="주가 (USD)"
+			)
+			st.plotly_chart(fig_event, use_container_width=True)
+			st.caption("💡 꿀팁: 차트를 드래그해서 확대하거나, 우측 상단 아이콘을 눌러 원래대로 되돌릴 수 있습니다.")
+			
+		except Exception as e:
+			st.warning(f"이벤트 차트를 그리는 중 오류가 발생했습니다: {e}")
+
+	st.divider()
+	# ====================================================================
+
 	st.subheader(f"📊 {ticker_symbol} 전문가용 캔들 차트 (최근 1년)")
 	df_chart = df.tail(252)
 	fig = go.Figure(data=[go.Candlestick(
