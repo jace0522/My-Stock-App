@@ -898,6 +898,55 @@ try:
 
 		st.divider()
 
+		# ====================================================================
+	# ✨ 신규 기능: AI 기반 산업 벨류체인 (공급망 & 경쟁사) 분석
+	# ====================================================================
+	st.divider()
+	st.subheader(f"🌐 {ticker_symbol} 산업 벨류체인 & 관계도")
+	
+	with st.expander(f"🔍 {ticker_symbol}의 공급사, 경쟁사, 고객사를 확인하세요", expanded=True):
+		with st.spinner("AI가 산업 지도를 분석하여 벨류체인을 구성 중입니다... 🏗️"):
+			# AI에게 벨류체인 정보를 요청하는 프롬프트
+			chain_prompt = f"""
+			미국 주식 {ticker_symbol} 기업을 중심으로 산업 벨류체인을 분석해줘. 
+			다음 3가지 카테고리에 대해 각각 주요 기업명과 티커(예: Apple(AAPL))를 포함해서 답변해줘.
+			
+			1. **공급사 (Upstream):** 이 기업에 핵심 부품이나 원자재를 공급하는 주요 기업들.
+			2. **경쟁사 (Horizontal):** 시장에서 직접적으로 점유율 싸움을 하는 주요 라이벌 기업들.
+			3. **고객사 및 파트너 (Downstream):** 이 기업의 제품을 구매하거나 강력한 파트너십을 맺은 기업들.
+			
+			각 카테고리별로 최대 5개씩, 한국어로 아주 간결하게(기업명과 티커 위주) 정리해줘.
+			"""
+			
+			try:
+				# 상단에 선언된 정식 모델(gemini-1.5-flash) 사용
+				chain_response = model.generate_content(chain_prompt)
+				chain_text = chain_response.text
+				
+				# 화면을 3개 구역으로 나눠서 예쁘게 배치
+				col_up, col_hor, col_down = st.columns(3)
+				
+				# 텍스트 파싱 (간단하게 줄바꿈 기준으로 분리하거나 통째로 출력)
+				# 여기서는 깔끔하게 카드 형태로 출력
+				with col_up:
+					st.success("⬆️ **공급사 (Suppliers)**")
+					# AI 응답에서 Upstream 부분만 추출하거나 전체 출력
+					st.write(chain_text.split("2.")[0].replace("1. **공급사 (Upstream):**", "").strip())
+					
+				with col_hor:
+					st.warning("⚔️ **경쟁사 (Competitors)**")
+					if "2." in chain_text and "3." in chain_text:
+						st.write(chain_text.split("2.")[1].split("3.")[0].replace("**경쟁사 (Horizontal):**", "").strip())
+					
+				with col_down:
+					st.info("⬇️ **고객사/파트너 (Customers)**")
+					if "3." in chain_text:
+						st.write(chain_text.split("3.")[1].replace("**고객사 및 파트너 (Downstream):**", "").strip())
+						
+			except Exception as e:
+				st.error(f"벨류체인 분석 중 오류가 발생했습니다: {e}")
+	# ====================================================================
+
 		st.subheader("🔮 기업의 '진짜 가치' 찾기 (DCF 모델)")
 		with st.expander("워렌 버핏처럼 기업의 적정 주가를 직접 계산해 보세요!", expanded=True):
 			st.write("회사가 미래에 벌어들일 잉여현금흐름(FCF)을 추정하여 현재 가치로 할인하는 절대 가치 평가 모델입니다.")
@@ -1290,91 +1339,6 @@ try:
 				st.warning(f"데이터가 부족하여 딥러닝 모델을 학습할 수 없습니다. (에러: {e})")
 
 	st.divider()
-
-	# ====================================================================
-	# ✨ 신규 기능: AI 이벤트 추적 인터랙티브 차트 (가짜 데이터 원천 차단!)
-	# ====================================================================
-	st.subheader("🚀 주가 폭등/폭락 원인 추적 (AI 뉴스 요약 차트)")
-	with st.expander("별표(⭐) 위에 마우스를 올려서 실제 주가 변동 이유를 확인하세요!", expanded=True):
-		try:
-			import time # API 과부하 방지용
-
-			df_event = df.tail(252).copy() 
-			df_event['Change'] = df_event['수익률'] * 100
-			
-			# 5% 이상 크게 움직인 날짜들 먼저 고르기
-			significant_events = df_event[abs(df_event['Change']) > 5].copy()
-			
-			# 🚨 가짜 데이터 다 지우고 빈칸으로 시작!
-			significant_events['Event_Text'] = ""
-
-			if not significant_events.empty:
-				with st.spinner(f"🕵️‍♂️ AI가 {ticker_symbol}의 과거 실제 뉴스를 검색 중입니다... (API 과부하 방지를 위해 5~10초 소요) ⏳"):
-					# 가장 심하게 폭등/폭락한 상위 5개 날짜만 뽑기
-					top_5_dates = significant_events['Change'].abs().nlargest(5).index
-					
-					for date in top_5_dates:
-						date_str = date.strftime('%Y-%m-%d')
-						change_val = significant_events.loc[date, 'Change']
-						
-						# 추측을 배제하고 팩트만 요구하는 프롬프트
-						prompt = f"미국 주식 {ticker_symbol}이(가) {date_str}에 주가가 약 {change_val:.1f}% 변동했습니다. 이 날짜 근처의 실제 경제 뉴스, 실적발표 등 명확한 사실(Fact)에 기반한 변동 원인을 한국어로 딱 1문장(50자 이내)으로 요약하세요. 추측성 내용은 절대 포함하지 마세요."
-						
-						try:
-							# 상단에서 정의한 글로벌 'model' 변수를 그대로 사용
-							response = model.generate_content(prompt)
-							real_news = response.text.replace('\n', ' ').strip()
-							
-							color_tag = "#00FF88" if change_val > 0 else "#FF4B4B"
-							sign = "폭등" if change_val > 0 else "폭락"
-							significant_events.loc[date, 'Event_Text'] = f"<b style='color:{color_tag};'>{sign}! ({change_val:.1f}%)</b><br>📰 <b>팩트 체크:</b> {real_news}"
-							
-							# API 연속 호출로 인한 Rate Limit(차단) 방지를 위해 1.5초 대기
-							time.sleep(1.5) 
-						except Exception as e:
-							# 에러가 나면 숨기지 않고 실패 사유를 그대로 노출
-							significant_events.loc[date, 'Event_Text'] = f"<b>({change_val:.1f}%)</b><br>⚠️ 실제 뉴스 로드 실패 (API 에러)"
-
-			# Event_Text가 성공적으로 채워진(AI가 진짜 뉴스를 가져온) 데이터만 남기기
-			valid_events = significant_events[significant_events['Event_Text'] != ""]
-
-			# 차트 그리기
-			fig_event = go.Figure()
-			fig_event.add_trace(go.Scatter(
-				x=df_event.index, y=df_event['Close'], 
-				mode='lines', name='주가 흐름', line=dict(color='rgba(255, 255, 255, 0.4)', width=2)
-			))
-			
-			if not valid_events.empty:
-				fig_event.add_trace(go.Scatter(
-					x=valid_events.index, 
-					y=valid_events['Close'],
-					mode='markers',
-					marker=dict(
-						color=['#00FF88' if c > 0 else '#FF4B4B' for c in valid_events['Change']], 
-						size=18, 
-						symbol='star',
-						line=dict(color='white', width=1)
-					),
-					name='주요 이벤트 (마우스 오버)',
-					text=valid_events['Event_Text'], 
-					hoverinfo='text' 
-				))
-			
-			fig_event.update_layout(
-				template="plotly_dark", height=400, 
-				margin=dict(l=20, r=20, t=30, b=20),
-				hovermode="closest",
-				yaxis_title="주가 (USD)"
-			)
-			st.plotly_chart(fig_event, use_container_width=True)
-			st.caption("💡 팩트 체크가 완료된 Top 5 핵심 변동일만 별표(⭐)로 표시됩니다.")
-			
-		except Exception as e:
-			st.error(f"이벤트 차트를 그리는 중 오류가 발생했습니다: {e}")
-
-	st.divider()
-	# ====================================================================
 
 	st.subheader(f"📊 {ticker_symbol} 전문가용 캔들 차트 (최근 1년)")
 	df_chart = df.tail(252)
