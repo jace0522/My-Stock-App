@@ -751,13 +751,17 @@ try:
 			else:
 				holdings[ticker_symbol] = {'shares': trade_shares, 'avg_price': current_price}
 			
-			# ✨ 매수 영수증 기록하기 (최신순으로 맨 앞에 추가)
+			# ✨ 매수 영수증 (매수할 때는 수익 실현이 없으므로 빈칸 처리)
 			now_str = pd.Timestamp.now(tz='Asia/Seoul').strftime("%Y-%m-%d %H:%M")
-			trade_record = {"날짜": now_str, "구분": "🟢 매수", "종목": ticker_symbol, "체결가": round(current_price, 2), "수량": trade_shares, "총액($)": round(trade_amount_usd, 2)}
+			trade_record = {
+				"날짜": now_str, "구분": "🟢 매수", "종목": ticker_symbol, 
+				"체결가": round(current_price, 2), "수량": trade_shares, "총액($)": round(trade_amount_usd, 2),
+				"실현수익($)": "-", "수익률(%)": "-"
+			}
 			st.session_state['account'].setdefault('trade_history', []).insert(0, trade_record)
 
 			account_ref.set(st.session_state['account'])
-			st.success(f"🎉 {ticker_symbol} {trade_shares}주 매수 완료! (DB 저장됨)")
+			st.success(f"🎉 {ticker_symbol} {trade_shares}주 매수 완료! (평단가: ${holdings[ticker_symbol]['avg_price']:.2f})")
 			st.rerun()
 		else:
 			st.error("잔고가 부족합니다!😅 (원화/달러 환율을 확인해 보세요)")
@@ -765,18 +769,34 @@ try:
 	if trade_col2.button("🔴 매도 (Sell)", use_container_width=True):
 		holdings = st.session_state['account']['holdings']
 		if ticker_symbol in holdings and holdings[ticker_symbol]['shares'] >= trade_shares:
+			# ✨ [핵심] 팔기 전에 미리 실현 수익과 수익률 계산하기!
+			old_avg_price = holdings[ticker_symbol]['avg_price']
+			realized_profit = (current_price - old_avg_price) * trade_shares
+			profit_rate = ((current_price - old_avg_price) / old_avg_price) * 100
+
+			# 계좌 잔고 업데이트 및 주식 수 차감
 			st.session_state['account']['cash'] += trade_amount_usd
 			holdings[ticker_symbol]['shares'] -= trade_shares
 			if holdings[ticker_symbol]['shares'] == 0:
 				del holdings[ticker_symbol]
 			
-			# ✨ 매도 영수증 기록하기
+			# ✨ 매도 영수증에 실현 수익과 수익률 추가!
 			now_str = pd.Timestamp.now(tz='Asia/Seoul').strftime("%Y-%m-%d %H:%M")
-			trade_record = {"날짜": now_str, "구분": "🔴 매도", "종목": ticker_symbol, "체결가": round(current_price, 2), "수량": trade_shares, "총액($)": round(trade_amount_usd, 2)}
+			trade_record = {
+				"날짜": now_str, "구분": "🔴 매도", "종목": ticker_symbol, 
+				"체결가": round(current_price, 2), "수량": trade_shares, "총액($)": round(trade_amount_usd, 2),
+				"실현수익($)": round(realized_profit, 2), "수익률(%)": round(profit_rate, 2)
+			}
 			st.session_state['account'].setdefault('trade_history', []).insert(0, trade_record)
 
 			account_ref.set(st.session_state['account'])
-			st.success(f"💸 {ticker_symbol} {trade_shares}주 매도 완료! (DB 저장됨)")
+			
+			# ✨ 수익 여부에 따라 다른 알림 메시지 띄우기
+			if realized_profit > 0:
+				st.success(f"💸 {ticker_symbol} {trade_shares}주 익절 완료! (+${realized_profit:.2f} 달달한 수익 🥳)")
+			else:
+				st.warning(f"💸 {ticker_symbol} {trade_shares}주 손절 완료! (${realized_profit:.2f} 손실 확정 🥲)")
+			
 			st.rerun()
 		else:
 			st.error("보유한 주식 수량이 부족합니다! 🤔")
