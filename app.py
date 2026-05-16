@@ -186,10 +186,14 @@ if 'account' not in st.session_state:
 	acc_doc = account_ref.get()
 	if acc_doc.exists:
 		st.session_state['account'] = acc_doc.to_dict()
+		# ✨ [신규 추가] 옛날 계좌에도 거래 내역 리스트 추가
+		if 'trade_history' not in st.session_state['account']:
+			st.session_state['account']['trade_history'] = []
 	else:
 		default_account = {
 			"cash": 10000.0,
-			"holdings": {}
+			"holdings": {},
+			"trade_history": [] # ✨ [신규 추가] 새 계좌에도 거래 내역 리스트 추가
 		}
 		st.session_state['account'] = default_account
 		account_ref.set(default_account)
@@ -489,6 +493,13 @@ with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 					fig_snow.update_layout(title=f"현재 내 포트폴리오 기반 자산 증식 시뮬레이션", xaxis_title="투자 기간 (년)", yaxis_title="자산 규모 (USD)", template="plotly_dark", hovermode="x unified", height=500)
 					st.plotly_chart(fig_snow, use_container_width=True)
 
+	# ✨ 모의투자 거래 내역 (영수증) 출력!
+	history_list = st.session_state['account'].get('trade_history', [])
+	if history_list:
+		with st.expander("🧾 나의 모의투자 매매 기록 (최신순)", expanded=False):
+			df_history = pd.DataFrame(history_list)
+			st.dataframe(df_history, use_container_width=True, hide_index=True)
+
 st.divider()
 
 # --- ✨ 신규 기능: 노벨상 수상 알고리즘! 포트폴리오 최적화 ---
@@ -739,6 +750,12 @@ try:
 				holdings[ticker_symbol]['avg_price'] = new_avg
 			else:
 				holdings[ticker_symbol] = {'shares': trade_shares, 'avg_price': current_price}
+			
+			# ✨ 매수 영수증 기록하기 (최신순으로 맨 앞에 추가)
+			now_str = pd.Timestamp.now(tz='Asia/Seoul').strftime("%Y-%m-%d %H:%M")
+			trade_record = {"날짜": now_str, "구분": "🟢 매수", "종목": ticker_symbol, "체결가": round(current_price, 2), "수량": trade_shares, "총액($)": round(trade_amount_usd, 2)}
+			st.session_state['account'].setdefault('trade_history', []).insert(0, trade_record)
+
 			account_ref.set(st.session_state['account'])
 			st.success(f"🎉 {ticker_symbol} {trade_shares}주 매수 완료! (DB 저장됨)")
 			st.rerun()
@@ -752,6 +769,12 @@ try:
 			holdings[ticker_symbol]['shares'] -= trade_shares
 			if holdings[ticker_symbol]['shares'] == 0:
 				del holdings[ticker_symbol]
+			
+			# ✨ 매도 영수증 기록하기
+			now_str = pd.Timestamp.now(tz='Asia/Seoul').strftime("%Y-%m-%d %H:%M")
+			trade_record = {"날짜": now_str, "구분": "🔴 매도", "종목": ticker_symbol, "체결가": round(current_price, 2), "수량": trade_shares, "총액($)": round(trade_amount_usd, 2)}
+			st.session_state['account'].setdefault('trade_history', []).insert(0, trade_record)
+
 			account_ref.set(st.session_state['account'])
 			st.success(f"💸 {ticker_symbol} {trade_shares}주 매도 완료! (DB 저장됨)")
 			st.rerun()
