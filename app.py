@@ -931,13 +931,62 @@ try:
 								'당기순이익 (Net Income)': fin_df['Net Income']
 							})
 							st.bar_chart(chart_data)
+							
+							# ==========================================================
+							# ✨ 신규 기능: 2번 🌊 기업 재무 흐름도 (Waterfall Chart)
+							# ==========================================================
+							st.write("🌊 **기업 재무 흐름도 (Waterfall Chart)**")
+							st.caption("💡 가장 최근 연도 기준, 회사가 번 돈(총매출)에서 원가, 비용, 세금이 어떻게 깎여나가고 내 손에 얼마(순이익)가 떨어지는지 해부합니다.")
+							try:
+								# 가장 최근 년도의 데이터(첫 번째 열) 가져오기
+								latest_fin = financials.iloc[:, 0]
+								
+								# 각 항목별 데이터 추출 (데이터가 없으면 0으로 처리)
+								rev = latest_fin.get('Total Revenue', 0)
+								cost = latest_fin.get('Cost Of Revenue', 0)
+								gross = latest_fin.get('Gross Profit', rev - cost)
+								opex = latest_fin.get('Operating Expenses', 0)
+								tax = latest_fin.get('Tax Provision', 0)
+								net = latest_fin.get('Net Income', 0)
+								
+								# 회계 밸런스를 맞추기 위해 기타 영업외 비용/수익 역산
+								other = rev - cost - opex - tax - net
+								
+								# 화폐 단위 자동 변환 함수 (한국 주식은 억원, 미국 주식은 밀리언 달러)
+								def fmt_w(val):
+									if "KS" in ticker_symbol or "KQ" in ticker_symbol:
+										return f"₩{val/1e8:.0f}억"
+									return f"${val/1e6:.0f}M"
+
+								# Plotly Waterfall 차트 그리기
+								fig_waterfall = go.Figure(go.Waterfall(
+									name = "재무 흐름",
+									orientation = "v",
+									measure = ["relative", "relative", "total", "relative", "relative", "relative", "total"],
+									x = ["총매출액", "매출원가", "매출총이익", "영업비용", "세금", "기타영업외", "당기순이익"],
+									textposition = "outside",
+									text = [fmt_w(rev), fmt_w(-cost), fmt_w(gross), fmt_w(-opex), fmt_w(-tax), fmt_w(-other), fmt_w(net)],
+									y = [rev, -cost, 0, -opex, -tax, -other, 0],
+									connector = {"line": {"color": "rgba(255,255,255,0.3)"}},
+									decreasing = {"marker": {"color": "#FF4B4B"}},  # 비용 차감은 빨간색
+									increasing = {"marker": {"color": "#00FF88"}},  # 수익 증가는 초록색
+									totals = {"marker": {"color": "#2563EB"}}       # 중간합계/총계는 파란색
+								))
+								
+								fig_waterfall.update_layout(
+									template="plotly_dark", height=450,
+									margin=dict(l=20, r=20, t=40, b=30),
+									waterfallgap=0.2
+								)
+								st.plotly_chart(fig_waterfall, use_container_width=True)
+							except Exception as e:
+								st.info("이 기업은 상세 재무 항목이 제공되지 않아 폭포수 차트를 그릴 수 없습니다.")
+							# ==========================================================
+
 						else:
 							st.info("이 종목은 상세 매출/이익 차트를 제공하지 않습니다.")
 					else:
 						st.info("재무제표 데이터가 없습니다. (ETF나 상장 폐지 종목일 수 있습니다.)")
-
-				except Exception as e:
-					st.warning(f"재무 데이터를 불러오는 중 오류가 발생했습니다: {e}")
 
 		st.divider()
 
