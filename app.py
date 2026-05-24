@@ -847,6 +847,98 @@ try:
 	
 	st.divider()
 
+	# ====================================================================
+	# ✨ 신규 기능: 3번 🕸️ 퀀트 다중 팩터 오각형 스코어 (Radar Chart)
+	# ====================================================================
+	st.subheader(f"🕸️ {ticker_symbol} 퀀트 핵심 능력치 (Radar Chart)")
+	with st.expander("이 기업의 5가지 핵심 스탯을 한눈에 파악하세요!", expanded=True):
+		try:
+			# 1. 가치 (Value) 점수 산정 (PER 기준: 낮을수록 고득점)
+			v_per = info.get('trailingPE', 0)
+			if v_per == 0: val_score = 50
+			elif v_per <= 10: val_score = 90
+			elif v_per <= 20: val_score = 70
+			elif v_per <= 30: val_score = 50
+			else: val_score = 30
+
+			# 2. 수익성 (Profitability) 점수 산정 (ROE 기준: 높을수록 고득점)
+			v_roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') else 0
+			if v_roe >= 20: prof_score = 90
+			elif v_roe >= 10: prof_score = 70
+			elif v_roe >= 0: prof_score = 50
+			else: prof_score = 20
+
+			# 3. 성장성 (Growth) 점수 산정 (매출 성장률 기준: 높을수록 고득점)
+			v_grow = info.get('revenueGrowth', 0) * 100 if info.get('revenueGrowth') else 0
+			if v_grow >= 20: grow_score = 90
+			elif v_grow >= 10: grow_score = 70
+			elif v_grow >= 0: grow_score = 50
+			else: grow_score = 20
+
+			# 4. 모멘텀 (Momentum) 점수 산정 (52주 최고가 대비 현재 주가 위치)
+			v_high = info.get('fiftyTwoWeekHigh', current_price)
+			if v_high > 0:
+				mom_score = min(100, int((current_price / v_high) * 100))
+			else:
+				mom_score = 50
+
+			# 5. 안정성 (Safety) 점수 산정 (부채비율 기준: 낮을수록 고득점)
+			v_debt = info.get('debtToEquity', 0) if info.get('debtToEquity') else 0
+			if v_debt == 0: safe_score = 50
+			elif v_debt <= 50: safe_score = 90
+			elif v_debt <= 100: safe_score = 70
+			elif v_debt <= 200: safe_score = 50
+			else: safe_score = 30
+
+			# 방어 로직 (0 미만, 100 초과 방지)
+			scores = [val_score, prof_score, grow_score, mom_score, safe_score]
+			scores = [max(0, min(100, s)) for s in scores]
+			
+			# 레이더 차트는 다각형을 닫기 위해 시작점과 끝점이 같아야 함
+			categories = ['가치 (Value)', '수익성 (Profit)', '성장성 (Growth)', '모멘텀 (Momentum)', '안정성 (Safety)']
+			categories_closed = categories + [categories[0]]
+			scores_closed = scores + [scores[0]]
+
+			fig_radar = go.Figure()
+			fig_radar.add_trace(go.Scatterpolar(
+				r=scores_closed,
+				theta=categories_closed,
+				fill='toself',
+				name=ticker_symbol,
+				line=dict(color='#00FF88', width=2),
+				fillcolor='rgba(0, 255, 136, 0.4)',
+				marker=dict(size=8)
+			))
+			fig_radar.update_layout(
+				polar=dict(
+					radialaxis=dict(visible=True, range=[0, 100], color='rgba(255,255,255,0.5)', gridcolor='rgba(255,255,255,0.2)'),
+					angularaxis=dict(color='white', linecolor='rgba(255,255,255,0.2)')
+				),
+				showlegend=False,
+				template="plotly_dark",
+				height=400,
+				margin=dict(l=40, r=40, t=40, b=40)
+			)
+			
+			# 차트와 텍스트를 반반 나눠서 깔끔하게 배치
+			r_col1, r_col2 = st.columns([1, 1])
+			with r_col1:
+				st.plotly_chart(fig_radar, use_container_width=True)
+			with r_col2:
+				st.write("### 📊 능력치 분석 요약")
+				st.write(f"- 💰 **가치 ({val_score}점):** PER {v_per:.1f} (낮을수록 저평가/고득점)")
+				st.write(f"- 👑 **수익성 ({prof_score}점):** ROE {v_roe:.1f}% (마진이 높을수록 고득점)")
+				st.write(f"- 🚀 **성장성 ({grow_score}점):** 매출성장률 {v_grow:.1f}% (꾸준히 클수록 고득점)")
+				st.write(f"- 📈 **모멘텀 ({mom_score}점):** 52주 최고가 대비 {mom_score}% 위치 (추세 강도)")
+				st.write(f"- 🛡️ **안정성 ({safe_score}점):** 부채비율 {v_debt:.1f}% (빚이 적을수록 고득점)")
+				st.info("💡 **가이드:** 면적이 넓고 꽉 찰수록(오각형에 가까울수록) 흠잡을 데 없는 완벽한 올라운더 우량주입니다.")
+
+		except Exception as e:
+			st.warning(f"스탯을 계산할 재무 데이터가 부족합니다: {e}")
+
+	st.divider()
+	# ====================================================================
+
 	# ✨ ETF 스마트 판별기 (이 종목이 주식인지 ETF인지 확인)
 	is_etf = info.get('quoteType') == 'ETF'
 
