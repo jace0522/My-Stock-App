@@ -365,6 +365,47 @@ if st.sidebar.button("🚀 바겐세일 종목 스캔 & 알림 쏘기"):
 # --- 메인 화면 ---
 st.title("주식 AI 분석 앱")
 
+# ====================================================================
+# ✨ 신규 기능: 4번 🌍 거시경제(Macro) 시장 풍향계 대시보드
+# ====================================================================
+st.subheader("🌍 글로벌 마크로(Macro) 시장 풍향계")
+with st.spinner("글로벌 시장의 전체 흐름을 읽어오는 중... ⏳"):
+	try:
+		# S&P 500, 10년물 국채 금리, VIX 공포지수 티커
+		macro_tickers = {"🇺🇸 S&P 500 (미국 증시)": "^GSPC", "🏦 10년물 국채 (시중 금리)": "^TNX", "😱 VIX (공포 지수)": "^VIX"}
+		m_cols = st.columns(3)
+		
+		for i, (name, t) in enumerate(macro_tickers.items()):
+			m_df = yf.Ticker(t).history(period="5d")
+			if len(m_df) >= 2:
+				current_val = m_df['Close'].iloc[-1]
+				prev_val = m_df['Close'].iloc[-2]
+				change_pct = ((current_val - prev_val) / prev_val) * 100
+				
+				# 지표별로 단위 및 포맷팅 맞춤 설정
+				if t == "^GSPC":
+					val_str = f"{current_val:,.2f}"
+					delta_str = f"{change_pct:+.2f}%"
+				elif t == "^TNX":
+					val_str = f"{current_val:.3f}%"
+					change_bp = (current_val - prev_val) * 100 # 금리 변동은 bp(베이시스 포인트) 단위로 계산
+					delta_str = f"{change_bp:+.1f} bp"
+				else: # VIX
+					val_str = f"{current_val:.2f}"
+					delta_str = f"{change_pct:+.2f}%"
+					
+				# 💡 디테일: 주식(S&P 500)은 오르면 초록색이지만, 금리나 공포지수는 오르면 악재(빨간색)로 표시!
+				d_color = "inverse" if t in ["^TNX", "^VIX"] else "normal"
+				
+				m_cols[i].metric(name, val_str, delta_str, delta_color=d_color)
+				
+	except Exception as e:
+		st.info("거시경제 데이터를 불러올 수 없습니다.")
+st.divider()
+# ====================================================================
+
+with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
+
 with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	my_cash = st.session_state['account']['cash']
 	my_holdings = st.session_state['account']['holdings']
