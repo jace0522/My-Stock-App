@@ -405,8 +405,6 @@ st.divider()
 # ====================================================================
 
 with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
-
-with st.expander("💼 나의 모의투자 계좌 현황", expanded=True):
 	my_cash = st.session_state['account']['cash']
 	my_holdings = st.session_state['account']['holdings']
 
