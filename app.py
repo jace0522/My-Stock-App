@@ -56,6 +56,7 @@ st.markdown("""
 # --- ✨ 리팩토링 1: 앱 설정 및 AI API 글로벌 세팅 ---
 st.set_page_config(layout="wide")
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel('gemini-3-flash-preview') # ✨ 이 줄을 추가!
 
 @st.cache_data(ttl=3600)
 def load_data(ticker):
