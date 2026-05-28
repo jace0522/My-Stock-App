@@ -1174,6 +1174,77 @@ try:
 				st.error(f"벨류체인 분석 중 오류가 발생했습니다: {e}")
 	# ====================================================================
 
+		# ====================================================================
+		# ✨ 신규 기능: 스마트 머니(Smart Money) 조기 경보 레이더 (4종 세트)
+		# ====================================================================
+		st.divider()
+		st.subheader(f"🚨 {ticker_symbol} 스마트 머니(Smart Money) 조기 경보 레이더")
+		st.write("기관 투자자, 내부자, 정치인 등 '정보의 최상위 포식자'들의 은밀한 선행 매매를 추적합니다.")
+
+		with st.expander("🔍 4대 조기 경보 시그널 엑스레이 스캔", expanded=True):
+			sm_col1, sm_col2 = st.columns(2)
+			
+			# 1. 내부자 거래 (Insider Trading) - yfinance 활용
+			with sm_col1:
+				st.markdown("#### 🕵️‍♂️ 1. 내부자 거래 (Insider)")
+				try:
+					insider_df = stock_obj.insider_transactions
+					if insider_df is not None and not insider_df.empty:
+						# 최신 거래 5건만 추출해서 표로 보여주기
+						st.dataframe(insider_df.head(5), use_container_width=True, hide_index=True)
+						st.caption("💡 CEO나 임원이 자기 돈으로 주식을 사고 있다면(Buy), 강력한 호재의 전조입니다.")
+					else:
+						st.info("최근 보고된 내부자 거래 내역이 없습니다.")
+				except Exception as e:
+					st.warning("내부자 거래 데이터를 불러올 수 없습니다.")
+
+			# 2. 비정상적 옵션 거래 (Options Activity) - Put/Call Ratio 계산
+			with sm_col2:
+				st.markdown("#### 🎰 2. 옵션 시장 배팅 (Options)")
+				try:
+					opts = stock_obj.options
+					if opts:
+						# 가장 가까운 만기일(단기 배팅)의 옵션 데이터 가져오기
+						chain = stock_obj.option_chain(opts[0])
+						call_vol = chain.calls['volume'].fillna(0).sum()
+						put_vol = chain.puts['volume'].fillna(0).sum()
+						
+						# 풋/콜 비율 계산 (0.7 이하: 롱 배팅, 1.0 이상: 숏 배팅)
+						p_c_ratio = put_vol / call_vol if call_vol > 0 else 0
+						
+						# 상승/하락 배팅에 따른 색상 및 아이콘 변화
+						if p_c_ratio < 0.7:
+							delta_text, d_color = "상승 배팅(Call) 압도적 🚀", "normal"
+						elif p_c_ratio > 1.0:
+							delta_text, d_color = "하락 배팅(Put) 압도적 🩸", "inverse"
+						else:
+							delta_text, d_color = "팽팽한 눈치싸움 ⚖️", "off"
+
+						st.metric(label=f"풋/콜 비율 (만기일: {opts[0]})", value=f"{p_c_ratio:.2f}", delta=delta_text, delta_color=d_color)
+						
+						col_opt1, col_opt2 = st.columns(2)
+						col_opt1.write(f"- 📈 **콜(상승) 거래량:**\n{call_vol:,.0f} 건")
+						col_opt2.write(f"- 📉 **풋(하락) 거래량:**\n{put_vol:,.0f} 건")
+						st.caption("💡 풋/콜 비율이 0.7 이하면 월가 거물들이 '상승'에 막대한 돈을 걸고 있다는 뜻입니다.")
+					else:
+						st.info("옵션 거래 데이터가 제공되지 않는 종목입니다.")
+				except Exception as e:
+					st.warning("옵션 데이터를 불러올 수 없습니다.")
+
+			# 3 & 4. 정치인 매매 및 대안 데이터 (Gemini AI 연동)
+			st.markdown("---")
+			st.markdown("#### 🏛️ 3 & 4. 정치인 매매 및 대안(Alternative) 데이터 분석 (AI)")
+			with st.spinner("AI가 최근 정치권 매매 동향과 채용 공고, 트래픽 급증 등의 숨은 데이터를 긁어오고 있습니다... ⏳"):
+				try:
+					sm_prompt = f"미국 주식 {ticker_symbol}에 대한 최근 한 달 내의 '의회/정치인 매매 동향(낸시 펠로시 등)'이나, '대안 데이터(핵심 엔지니어 채용 급증, 웹사이트 트래픽 폭증, 정부 보조금 수주 등)'와 관련된 시그널이 있는지 확인해줘. 팩트 기반으로 3~4줄로 핵심만 요약해줘. (만약 뚜렷한 정보가 없다면 '현재 특이한 정치인 매매나 대안 데이터 시그널은 포착되지 않았습니다'라고 명확히 답변해.)"
+					
+					sm_response = model.generate_content(sm_prompt)
+					st.success(f"🤖 **AI 레이더 브리핑:**\n\n{sm_response.text}")
+					st.caption("💡 미국 정치인들의 선행 매매 내역이나 특정 직군의 채용 급증은 주가 폭등의 가장 확실한 힌트 중 하나입니다.")
+				except Exception as e:
+					st.error(f"AI 데이터를 불러오는 중 오류가 발생했습니다: {e}")
+		# ====================================================================
+
 		st.subheader("🔮 기업의 '진짜 가치' 찾기 (DCF 모델)")
 		with st.expander("워렌 버핏처럼 기업의 적정 주가를 직접 계산해 보세요!", expanded=True):
 			st.write("회사가 미래에 벌어들일 잉여현금흐름(FCF)을 추정하여 현재 가치로 할인하는 절대 가치 평가 모델입니다.")
